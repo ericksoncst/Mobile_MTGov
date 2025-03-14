@@ -1,0 +1,7 @@
+{
+    "robot.language-server.python": "C:/MTGOV_MOBILE/.venv/Scripts/python.exe",
+    "robot.language-server.enabled": true,
+    "robot.language-server.args": [],
+    "robot.language-server.trace.server": "verbose"
+
+}
