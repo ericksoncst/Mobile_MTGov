@@ -19,6 +19,7 @@ abrir app
     ...    uiautomator2ServerInstallTimeout=60000
     ...    adbExecTimeout=60000
     ...    autoGrantPermissions=true
+    ...    uiautomator2ServerInstallTimeout=60000
 
     Sleep    2s
 
