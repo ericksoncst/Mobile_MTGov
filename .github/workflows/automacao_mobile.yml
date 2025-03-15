@@ -35,7 +35,7 @@ jobs:
 
       - name: Rodar testes Robot Framework
         run: |
-          robot -d logs .\testCases 
+         robot -d logs ./testCases
 
       - name: Upload de Relatórios
         uses: actions/upload-artifact@v4
