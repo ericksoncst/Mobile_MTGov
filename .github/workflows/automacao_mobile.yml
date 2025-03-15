@@ -27,6 +27,9 @@ jobs:
           pip install robotframework
           pip install robotframework-appiumlibrary
           pip install -r requirements.txt
+          
+      - name: Start Appium Server
+        run: appium --log-level error & npx wait-on tcp:4723
 
       - name: Iniciar Appium Server
         run: |
