@@ -46,19 +46,26 @@ jobs:
           # Baixar as ferramentas de linha de comando do Android
           Invoke-WebRequest -Uri "https://dl.google.com/android/repository/commandlinetools-win-7583922_latest.zip" -OutFile "commandlinetools.zip"
           Expand-Archive -Path "commandlinetools.zip" -DestinationPath "C:\android-sdk"
-          
-          # Configurar o SDK
-          $Env:Path += ";C:\android-sdk\cmdline-tools\bin"
-          
-          # Aceitar licenças e instalar os pacotes necessários
-          yes | C:\android-sdk\cmdline-tools\bin\sdkmanager --licenses
-          C:\android-sdk\cmdline-tools\bin\sdkmanager "platform-tools" "system-images;android-30;google_apis;x86_64"
 
+          # Criar o diretório 'latest' necessário para o sdkmanager
+          New-Item -Path "C:\android-sdk\cmdline-tools" -Name "latest" -ItemType Directory -Force
           
+          # Mover as ferramentas extraídas para o diretório 'latest'
+          Move-Item -Path "C:\android-sdk\cmdline-tools\*" -Destination "C:\android-sdk\cmdline-tools\latest"
+
+          # Configurar o SDK no PATH
+          $Env:Path += ";C:\android-sdk\cmdline-tools\latest\bin"
+
+          # Aceitar licenças e instalar os pacotes necessários
+          C:\android-sdk\cmdline-tools\latest\bin\sdkmanager --licenses
+
+          # Instalar plataforma e imagens do sistema
+          C:\android-sdk\cmdline-tools\latest\bin\sdkmanager "platform-tools" "system-images;android-30;google_apis;x86_64"
+
       - name: Start Emulator
         run: |
-              # Iniciar o emulador Android (não precisa de janela ou áudio)
-              Start-Process -NoNewWindow -FilePath "C:\android-sdk\emulator\emulator.exe" -ArgumentList "-avd", "Pixel_4_API_30", "-no-window", "-no-audio"
+          # Iniciar o emulador Android (não precisa de janela ou áudio)
+          Start-Process -NoNewWindow -FilePath "C:\android-sdk\emulator\emulator.exe" -ArgumentList "-avd", "Pixel_4_API_30", "-no-window", "-no-audio"
 
       - name: Wait for emulator to start
         run: |
