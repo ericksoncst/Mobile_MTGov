@@ -41,6 +41,9 @@ jobs:
           pip install robotframework-appiumlibrary
           pip install -r requirements.txt
 
+      - name: Install dependencies
+        run: choco install adb
+
       - name: Install Android Emulator
         run: |
           # Baixar as ferramentas de linha de comando do Android
@@ -50,8 +53,11 @@ jobs:
           # Criar o diretório 'latest' necessário para o sdkmanager
           New-Item -Path "C:\android-sdk\cmdline-tools" -Name "latest" -ItemType Directory -Force
           
-          # Mover as ferramentas extraídas para o diretório 'latest'
-          Move-Item -Path "C:\android-sdk\cmdline-tools\*" -Destination "C:\android-sdk\cmdline-tools\latest"
+          # Mover os arquivos extraídos para a pasta 'latest' diretamente
+          Move-Item -Path "C:\android-sdk\cmdline-tools\cmdline-tools\*" -Destination "C:\android-sdk\cmdline-tools\latest"
+
+          # Remover a pasta desnecessária após o movimento
+          Remove-Item -Path "C:\android-sdk\cmdline-tools\cmdline-tools" -Recurse -Force
 
           # Configurar o SDK no PATH
           $Env:Path += ";C:\android-sdk\cmdline-tools\latest\bin"
@@ -70,11 +76,10 @@ jobs:
       - name: Wait for emulator to start
         run: |
           adb wait-for-device
-          
+
       - name: Install APK
         run: |
           adb install -r C:/MTGOV_MOBILE/Apps/app.apk
-                     
       - name: Install Appium
         run: npm install -g appium
 
