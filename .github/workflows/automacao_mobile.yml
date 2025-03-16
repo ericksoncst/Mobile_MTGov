@@ -44,6 +44,9 @@ jobs:
       - name: Install dependencies
         run: choco install adb
 
+        env:
+          ANDROID_SDK_ROOT: C:\Users\runneradmin\AppData\Local\Android\Sdk
+
       - name: Install Android Emulator
         run: |
           # Baixar as ferramentas de linha de comando do Android
@@ -52,9 +55,11 @@ jobs:
 
           # Verifique a estrutura dos diretórios após a extração
           Get-ChildItem -Path "C:\android-sdk\cmdline-tools" -Recurse
+          
+          Write-Host "SDK Path: $env:ANDROID_SDK_ROOT"
 
           # Mover os arquivos extraídos corretamente para a pasta 'latest'
-          Move-Item -Path "C:\android-sdk\cmdline-tools\cmdline-tools\*" -Destination "C:\android-sdk\cmdline-tools\latest" -Force
+          Move-Item -Path "$env:ANDROID_SDK_ROOT\cmdline-tools\*" -Destination "$env:ANDROID_SDK_ROOT\cmdline-tools"
 
           # Remover a pasta desnecessária após o movimento
           Remove-Item -Path "C:\android-sdk\cmdline-tools\cmdline-tools" -Recurse -Force
