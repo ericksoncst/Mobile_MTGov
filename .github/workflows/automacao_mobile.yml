@@ -13,6 +13,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    
+      - name: Wait before tests
+        run: sleep 20
+         
       - name: Checkout do código
         uses: actions/checkout@v3
 
