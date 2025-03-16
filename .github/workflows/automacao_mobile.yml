@@ -13,90 +13,68 @@ jobs:
     runs-on: windows-latest
 
     steps:
+      - name: Checkout do código
+        uses: actions/checkout@v3
 
-      - name: Set up JDK 11
+      - name: Configurar ambiente Java
         uses: actions/setup-java@v2
         with:
           java-version: '11'
           distribution: 'temurin'
   
-      - name: Install ADB (Windows)
-        run: choco install adb
-        
-      - name: Wait before tests
-        run: sleep 20
-         
-      - name: Checkout do código
-        uses: actions/checkout@v3
-
       - name: Configurar ambiente Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
 
-      - name: Instalar dependências
+      - name: Instalar dependências Python
         run: |
           python -m pip install --upgrade pip
-          pip install robotframework
-          pip install robotframework-appiumlibrary
           pip install -r requirements.txt
 
-      - name: Install dependencies
-        run: choco install adb
-
-        env:
-          ANDROID_SDK_ROOT: C:\Users\User\AppData\Local\Android\Sdk\cmdline-tools
-
-      - name: Install Android Emulator
+      - name: Instalar dependências (ADB e Appium)
         run: |
-          # Baixar as ferramentas de linha de comando do Android
-          Invoke-WebRequest -Uri "https://dl.google.com/android/repository/commandlinetools-win-7583922_latest.zip" -OutFile "commandlinetools.zip"
-          Expand-Archive -Path "commandlinetools.zip" -DestinationPath "C:\android-sdk"
+          choco install adb
+          npm install -g appium
+          npm install -g npx
+          appium -v
 
-          # Verifique a estrutura dos diretórios após a extração
-          Get-ChildItem -Path "C:\android-sdk\cmdline-tools" -Recurse
-          
-          Write-Host "SDK Path: $env:ANDROID_SDK_ROOT"
-
-          # Mover os arquivos extraídos corretamente para a pasta 'latest'
-          Move-Item -Path "$env:ANDROID_SDK_ROOT\cmdline-tools\*" -Destination "$env:ANDROID_SDK_ROOT\cmdline-tools"
-
-          # Remover a pasta desnecessária após o movimento
-          Remove-Item -Path "C:\android-sdk\cmdline-tools\cmdline-tools" -Recurse -Force
-
-          # Configurar o SDK no PATH
-          $Env:Path += ";C:\android-sdk\cmdline-tools\latest\bin"
-
-          # Aceitar licenças e instalar os pacotes necessários
-          C:\Users\User\AppData\Local\Android\Sdk\cmdline-tools\latest\bin --licenses
-
-          # Instalar plataforma e imagens do sistema
-          C:\Users\User\AppData\Local\Android\Sdk\cmdline-tools\latest\bin "platform-tools" "system-images;android-30;google_apis;x86_64"
-
-      - name: Start Emulator
+      - name: Configurar Android SDK
         run: |
-          # Iniciar o emulador Android (não precisa de janela ou áudio)
-          Start-Process -NoNewWindow -FilePath "C:\android-sdk\emulator\emulator.exe" -ArgumentList "-avd", "Pixel_4_API_30", "-no-window", "-no-audio"
+          echo "Configurando Android SDK..."
+          echo "ANDROID_HOME=C:\Users\User\AppData\Local\Android\Sdk" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=C:\Users\User\AppData\Local\Android\Sdk" >> $GITHUB_ENV
+          echo "PATH=$PATH;C:\Users\User\AppData\Local\Android\Sdk\platform-tools" >> $GITHUB_ENV
+          echo "PATH=$PATH;C:\Users\User\AppData\Local\Android\Sdk\cmdline-tools\latest\bin" >> $GITHUB_ENV
 
-      - name: Wait for emulator to start
+      - name: Criar e Iniciar Emulador Android
         run: |
+          echo "Criando emulador..."
+          echo "no | avdmanager create avd -n test_avd -k 'system-images;android-30;google_apis;x86_64'" | cmd
+          echo "Iniciando emulador..."
+          emulator -avd test_avd -no-window -no-audio &
+
+      - name: Aguardar inicialização do Emulador
+        run: |
+          echo "Esperando emulador iniciar..."
           adb wait-for-device
+          adb shell getprop sys.boot_completed
 
-      - name: Install APK
+      - name: Instalar APK no Emulador
         run: |
           adb install -r C:/MTGOV_MOBILE/Apps/app.apk
-      - name: Install Appium
-        run: npm install -g appium
 
-      - name: Start Appium Server
-        run: appium --log-level error & npx wait-on tcp:4723
+      - name: Iniciar Appium Server
+        run: |
+          npx appium --log-level error & npx wait-on tcp:4723
 
       - name: Rodar testes Robot Framework
         run: |
-         robot -d logs ./testCases
+          mkdir logs || true
+          robot -d logs ./testCases
 
       - name: Upload de Relatórios
         uses: actions/upload-artifact@v4
         with:
-            name: Relatorio-Testes
-            path: results/
+          name: Relatorio-Testes
+          path: logs/
