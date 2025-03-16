@@ -45,7 +45,7 @@ jobs:
         run: choco install adb
 
         env:
-          ANDROID_SDK_ROOT: C:\Users\runneradmin\AppData\Local\Android\Sdk
+          ANDROID_SDK_ROOT: C:\Users\User\AppData\Local\Android\Sdk\cmdline-tools
 
       - name: Install Android Emulator
         run: |
@@ -68,10 +68,10 @@ jobs:
           $Env:Path += ";C:\android-sdk\cmdline-tools\latest\bin"
 
           # Aceitar licenças e instalar os pacotes necessários
-          C:\android-sdk\cmdline-tools\latest\bin\sdkmanager --licenses
+          C:\Users\User\AppData\Local\Android\Sdk\cmdline-tools\latest\bin --licenses
 
           # Instalar plataforma e imagens do sistema
-          C:\android-sdk\cmdline-tools\latest\bin\sdkmanager "platform-tools" "system-images;android-30;google_apis;x86_64"
+          C:\Users\User\AppData\Local\Android\Sdk\cmdline-tools\latest\bin "platform-tools" "system-images;android-30;google_apis;x86_64"
 
       - name: Start Emulator
         run: |
