@@ -50,11 +50,11 @@ jobs:
           Invoke-WebRequest -Uri "https://dl.google.com/android/repository/commandlinetools-win-7583922_latest.zip" -OutFile "commandlinetools.zip"
           Expand-Archive -Path "commandlinetools.zip" -DestinationPath "C:\android-sdk"
 
-          # Criar o diretório 'latest' necessário para o sdkmanager
-          New-Item -Path "C:\android-sdk\cmdline-tools" -Name "latest" -ItemType Directory -Force
-          
-          # Mover os arquivos extraídos para a pasta 'latest' diretamente
-          Move-Item -Path "C:\android-sdk\cmdline-tools\cmdline-tools\*" -Destination "C:\android-sdk\cmdline-tools\latest"
+          # Verifique a estrutura dos diretórios após a extração
+          Get-ChildItem -Path "C:\android-sdk\cmdline-tools" -Recurse
+
+          # Mover os arquivos extraídos corretamente para a pasta 'latest'
+          Move-Item -Path "C:\android-sdk\cmdline-tools\cmdline-tools\*" -Destination "C:\android-sdk\cmdline-tools\latest" -Force
 
           # Remover a pasta desnecessária após o movimento
           Remove-Item -Path "C:\android-sdk\cmdline-tools\cmdline-tools" -Recurse -Force
