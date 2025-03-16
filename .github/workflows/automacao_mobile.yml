@@ -23,9 +23,6 @@ jobs:
       - name: Install ADB (Windows)
         run: choco install adb
         
-      - name: Install APK
-        run: adb install -r C:/MTGOV_MOBILE/Apps/app.apk
-
       - name: Wait before tests
         run: sleep 20
          
@@ -43,7 +40,27 @@ jobs:
           pip install robotframework
           pip install robotframework-appiumlibrary
           pip install -r requirements.txt
+
+      - name: Install Android Emulator
+        run: |
+          wget https://dl.google.com/android/repository/commandlinetools-linux-7583922_latest.zip
+          unzip commandlinetools-linux-7583922_latest.zip -d $HOME/android-sdk
+          export PATH=$PATH:$HOME/android-sdk/cmdline-tools/bin
+          yes | sdkmanager --licenses
+          sdkmanager "platform-tools" "system-images;android-30;google_apis;x86_64"
           
+      - name: Start Emulator
+        run: |
+              nohup $HOME/android-sdk/emulator/emulator -avd Pixel_4_API_30 -no-window -no-audio &
+
+      - name: Wait for emulator to start
+        run: |
+          adb wait-for-device
+          
+      - name: Install APK
+        run: |
+          adb install -r C:/MTGOV_MOBILE/Apps/app.apk
+                     
       - name: Install Appium
         run: npm install -g appium
 
