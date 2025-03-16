@@ -13,7 +13,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    
+
+      - name: Install APK
+        run: adb install -r C:/MTGOV_MOBILE/Apps/app.apk
+
       - name: Wait before tests
         run: sleep 20
          
