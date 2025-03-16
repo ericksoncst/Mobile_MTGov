@@ -32,9 +32,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Instalar dependências (ADB e Appium)
-        run: |
-          choco install adb
+      - name: Instalar ADB no Ubuntu
+        run: sudo apt-get update && sudo apt-get install -y adb
+
           npm install -g appium
           npm install -g npx
           appium -v
