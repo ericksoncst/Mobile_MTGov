@@ -14,8 +14,8 @@ jobs:
 
     steps:
       - name: 🛎️ Checkout do código
-        uses: actions/checkout@v3
-
+        uses:  actions/upload-artifact@v4
+        
       - name: 📦 Instalar dependências
         run: |
           sudo apt update
