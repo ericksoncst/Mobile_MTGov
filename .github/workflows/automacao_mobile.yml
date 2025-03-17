@@ -14,7 +14,8 @@ jobs:
 
     steps:
       - name: 🛎️ Checkout do código
-        uses: actions/upload-artifact@v2
+        uses:  actions/upload-artifact@latest
+
         
       - name: 📦 Instalar dependências
         run: |
