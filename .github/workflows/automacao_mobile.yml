@@ -49,29 +49,32 @@ jobs:
 
       - name: Criar e Iniciar Emulador Android
         env:
+          ANDROID_SDK_ROOT: C:\Users\User\AppData\Local\Android\Sdk
+        run: |
+          run: |
+          echo "Instalando SDK do Android..."
+          mkdir -p $ANDROID_SDK_ROOT
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-8512546_latest.zip -O cmdline-tools.zip
+          unzip -q cmdline-tools.zip -d $ANDROID_SDK_ROOT
+          mv $ANDROID_SDK_ROOT/cmdline-tools $ANDROID_SDK_ROOT/latest
+          export PATH=$ANDROID_SDK_ROOT/latest/bin:$PATH
+          yes | sdkmanager --licenses || true
+          yes | sdkmanager --install "platform-tools" "emulator" "platforms;android-30" "system-images;android-30;google_apis;x86_64"
+
+      - name: Criar e Iniciar Emulador Android
+        env:
           ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
         run: |
           echo "Criando emulador..."
+          export PATH=$ANDROID_SDK_ROOT/latest/bin:$PATH
+          echo "no" | avdmanager create avd -n test_avd -k "system-images;android-30;google_apis;x86_64" --device "pixel_4"
     
-          # Atualizar pacotes e aceitar licenças automaticamente
-          yes | ${ANDROID_SDK_ROOT}/cmdline-tools/bin/sdkmanager --licenses || true
-      
-          # Instalar imagem do sistema necessária para o emulador
-          yes | ${ANDROID_SDK_ROOT}/cmdline-tools/bin/sdkmanager --install "system-images;android-30;google_apis;x86_64"
-      
-          # Criar o AVD (emulador)
-          echo "no" | ${ANDROID_SDK_ROOT}/cmdline-tools/bin/avdmanager create avd -n test_avd -k "system-images;android-30;google_apis;x86_64" --device "pixel_4"
-      
-          # Iniciar o emulador em background
           echo "Iniciando emulador..."
-          nohup ${ANDROID_SDK_ROOT}/emulator/emulator -avd test_avd -no-window -no-audio -gpu swiftshader_indirect &
+          nohup emulator -avd test_avd -no-window -no-audio -gpu swiftshader_indirect &
       
-          # Aguardar o emulador ficar pronto
           echo "Aguardando inicialização do emulador..."
           adb wait-for-device
           adb shell input keyevent 82
-
-
       - name: Aguardar inicialização do Emulador
         run: |
           echo "Esperando emulador iniciar..."
