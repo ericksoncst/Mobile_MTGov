@@ -14,7 +14,7 @@ jobs:
 
     steps:
       - name: 🛎️ Checkout do código
-        uses:  actions/upload-artifact@v4
+        uses: actions/upload-artifact@v2
         
       - name: 📦 Instalar dependências
         run: |
@@ -42,7 +42,7 @@ jobs:
           robot --outputdir results tests/
 
       - name: 📤 Upload dos logs e relatórios
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v2
         with:
           name: test-results
           path: results/
