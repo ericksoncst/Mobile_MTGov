@@ -49,14 +49,13 @@ jobs:
 
       - name: Criar e Iniciar Emulador Android
         run: |
-          - name: Criar e Iniciar Emulador Android
           echo "Criando emulador..."
     
           # Instalar imagem do sistema necessária para o emulador
           yes | ${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager --install "system-images;android-30;google_apis;x86_64"
 
           # Criar o AVD (emulador)
-          echo "no" | ${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/avdmanager create avd -n test_avd -k "system-images;android-30;google_apis;x86_64" --device "pixel_4"
+          echo "no" | ${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/avdmanager create avd -n test_avd -k "system-images;android-30;google_apis;x86_64" --device "pixel_4"google_apis;x86_64" --device "pixel_4"
 
           # Iniciar o emulador em background
           echo "Iniciando emulador..."
