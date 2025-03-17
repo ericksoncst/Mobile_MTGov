@@ -16,6 +16,12 @@ jobs:
       - name: 🛎️ Checkout do código
         uses:  actions/upload-artifact@v2
 
+      - name: Upload artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: my-artifact
+          path: ./path/to/artifac
+
         
       - name: 📦 Instalar dependências
         run: |
