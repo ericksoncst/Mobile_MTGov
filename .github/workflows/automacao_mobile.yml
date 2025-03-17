@@ -1,63 +1,48 @@
-name: Teste com Emulador Android
+name: Mobile Automation CI
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
   test:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Configurar ambiente Android
+      - name: 🛎️ Checkout do código
+        uses: actions/checkout@v3
+
+      - name: 📦 Instalar dependências
+        run: |
+          sudo apt update
+          sudo apt install -y openjdk-11-jdk android-sdk wget unzip
+          pip install robotframework robotframework-appiumlibrary
+
+      - name: 📥 Configurar Android SDK
         env:
-          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
-          ANDROID_HOME: /usr/local/lib/android/sdk
-          PATH: /usr/local/lib/android/sdk/cmdline-tools/latest/bin:/usr/local/lib/android/sdk/platform-tools:/usr/local/lib/android/sdk/emulator:$PATH
+          ANDROID_SDK_ROOT: /usr/lib/android-sdk
         run: |
-          echo "Instalando pacotes necessários..."
-          apt-get update && apt-get install -y unzip wget curl
+          echo "export ANDROID_HOME=$ANDROID_SDK_ROOT" >> $HOME/.bashrc
+          echo "export PATH=$ANDROID_SDK_ROOT/platform-tools:$ANDROID_SDK_ROOT/cmdline-tools:$PATH" >> $HOME/.bashrc
+          source $HOME/.bashrc
+          sdkmanager --install "platform-tools" "platforms;android-30" "build-tools;30.0.3"
+          adb devices
 
-
-          echo "Baixando e instalando Command Line Tools..."
-          mkdir -p $ANDROID_SDK_ROOT/cmdline-tools
-          cd $ANDROID_SDK_ROOT/cmdline-tools
-          wget -q https://dl.google.com/android/repository/commandlinetools-linux-10406996_latest.zip -O cmdline-tools.zip
-          unzip -q cmdline-tools.zip
-          mv cmdline-tools latest
-          
-          echo "Configurando PATH..."
-          echo "export ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> ~/.bashrc
-          echo "export ANDROID_HOME=$ANDROID_HOME" >> ~/.bashrc
-          echo "export PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$ANDROID_SDK_ROOT/emulator:$PATH" >> ~/.bashrc
-          source ~/.bashrc
-
-          echo "Verificando instalação do sdkmanager..."
-          $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --version
-
-      - name: Instalar SDK e Criar Emulador
-        env:
-          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+      - name: 🚀 Iniciar Appium Server
         run: |
-          echo "Aceitando licenças do SDK..."
-          yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          npm install -g appium
+          appium --log-level error > appium.log 2>&1 &
 
-          echo "Instalando componentes do SDK..."
-          yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --install "platform-tools" "emulator" "platforms;android-30" "system-images;android-30;google_apis;x86_64"
-
-          echo "Criando emulador..."
-          echo "no" | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/avdmanager create avd -n test_avd -k "system-images;android-30;google_apis;x86_64" --device "pixel_4"
-
-      - name: Iniciar Emulador
-        env:
-          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+      - name: 🎯 Executar testes com Robot Framework
         run: |
-          echo "Iniciando emulador..."
-          nohup $ANDROID_SDK_ROOT/emulator/emulator -avd test_avd -no-window -no-audio -gpu swiftshader_indirect &
+          robot --outputdir results tests/
 
-          echo "Aguardando inicialização do emulador..."
-          $ANDROID_SDK_ROOT/platform-tools/adb wait-for-device
-          $ANDROID_SDK_ROOT/platform-tools/adb shell input keyevent 82
-
-      - name: Verificar Emulador
-        run: |
-          echo "Verificando se o emulador está rodando..."
-          $ANDROID_SDK_ROOT/platform-tools/adb devices
+      - name: 📤 Upload dos logs e relatórios
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results
+          path: results/
