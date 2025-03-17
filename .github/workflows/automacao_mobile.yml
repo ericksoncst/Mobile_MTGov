@@ -48,23 +48,29 @@ jobs:
           echo "PATH=$PATH;C:\Users\User\AppData\Local\Android\Sdk\cmdline-tools\latest\bin" >> $GITHUB_ENV
 
       - name: Criar e Iniciar Emulador Android
+        env:
+          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
         run: |
           echo "Criando emulador..."
     
+          # Atualizar pacotes e aceitar licenças automaticamente
+          yes | ${ANDROID_SDK_ROOT}/cmdline-tools/bin/sdkmanager --licenses || true
+      
           # Instalar imagem do sistema necessária para o emulador
-          yes | ${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager --install "system-images;android-30;google_apis;x86_64"
-
+          yes | ${ANDROID_SDK_ROOT}/cmdline-tools/bin/sdkmanager --install "system-images;android-30;google_apis;x86_64"
+      
           # Criar o AVD (emulador)
-          echo "no" | ${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/avdmanager create avd -n test_avd -k "system-images;android-30;google_apis;x86_64" --device "pixel_4"google_apis;x86_64" --device "pixel_4"
-
+          echo "no" | ${ANDROID_SDK_ROOT}/cmdline-tools/bin/avdmanager create avd -n test_avd -k "system-images;android-30;google_apis;x86_64" --device "pixel_4"
+      
           # Iniciar o emulador em background
           echo "Iniciando emulador..."
           nohup ${ANDROID_SDK_ROOT}/emulator/emulator -avd test_avd -no-window -no-audio -gpu swiftshader_indirect &
-    
+      
           # Aguardar o emulador ficar pronto
           echo "Aguardando inicialização do emulador..."
           adb wait-for-device
           adb shell input keyevent 82
+
 
       - name: Aguardar inicialização do Emulador
         run: |
