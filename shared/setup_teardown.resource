@@ -1,5 +1,6 @@
 *** Settings ***
-Resource  ../common/main.robot
+Library  AppiumLibrary
+Resource  ../common/main.resource
 
 ** Variables ***
 ${PLATFORM_NAME}    Android
@@ -19,9 +20,9 @@ abrir app
     ...    uiautomator2ServerInstallTimeout=60000
     ...    adbExecTimeout=60000
     ...    autoGrantPermissions=true
+    ...    isHeadless=true
 
-    Sleep    2s
-
+    
 
 fechar app
     clicar no botao inicio
@@ -32,4 +33,26 @@ fechar app
     Click Element    //android.widget.Button[@resource-id="android:id/button1"]
     o usuario esteja na Home do APP
     Close All Applications
+
+# *** Variables ***
+# ${BROWSERSTACK_USERNAME}      nereucostanoguei1
+# ${BROWSERSTACK_ACCESS_KEY}    qyNiqcXezmuw8A53MkM1
+# ${BROWSERSTACK_APP_URL}       bs://0fdae4713dd6fcbf44b67d703d932f20886a5b72
+# ${DEVICE_NAME}                Google Pixel 7
+# ${PLATFORM_NAME}              Android
+# ${BROWSERSTACK_URL}           https://${BROWSERSTACK_USERNAME}:${BROWSERSTACK_ACCESS_KEY}@hub-cloud.browserstack.com/wd/hub
+
+# *** Keywords ***
+# abrir app
+#     Open Application    ${BROWSERSTACK_URL}
+#     ...    platformName=${PLATFORM_NAME}
+#     ...    deviceName=${DEVICE_NAME}
+#     ...    app=${BROWSERSTACK_APP_URL}
+#     ...    automationName=UiAutomator2
+#     ...    autoGrantPermissions=true
+#     ...    newCommandTimeout=600
+
+# fechar app
+#     Close All Applications
+
 

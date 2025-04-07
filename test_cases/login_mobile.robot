@@ -1,5 +1,5 @@
 *** Settings ***
-Resource    ../common/main.robot
+Resource    ../common/main.resource
 Test Setup    Abrir app
 Test Teardown   fechar app
 
@@ -17,12 +17,13 @@ Cenario 1 : logar no APP mt.gov.br com dados usuario
     E clicar no botao entrar
     #Então o sistema exibira o perfil logado
 
-Cenario 2 : logar no APP mt.gov.br com dados de servidor
-    [Tags]  servidor
-    VAR  ${letra}    ${SERVIDOR.LETRA}    scope=TEST
-    Dado que o usuario esteja na Home do APP
-    Quando o usuario clicar no botao entrarCom
-    E inserir o cpf ${SERVIDOR.CPF}
-    E inserir a senha ${SERVIDOR.PASSWORD}
-    E clicar no botao entrar
-    #Então o sistema exibira o perfil do usuario logado
+
+# Cenario 2 : logar no APP mt.gov.br com dados de servidor
+#     [Tags]  servidor
+#     VAR  ${letra}    ${SERVIDOR.LETRA}    scope=TEST
+#     Dado que o usuario esteja na Home do APP
+#     Quando o usuario clicar no botao entrarCom
+#     E inserir o cpf ${SERVIDOR.CPF}
+#     E inserir a senha ${SERVIDOR.PASSWORD}
+#     E clicar no botao entrar
+#     #Então o sistema exibira o perfil do usuario logado

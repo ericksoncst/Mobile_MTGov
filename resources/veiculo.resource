@@ -1,5 +1,5 @@
 *** Settings ***
-Resource  ../common/main.robot
+Resource  ../common/main.resource
 
 *** Variables ***
 ${VEICULO}  //android.view.ViewGroup[@content-desc="Veículo"]/android.view.ViewGroup/android.view.ViewGroup
@@ -21,7 +21,3 @@ o usuario esteja logado no APP VEICULO
 o usuario clicar na opção VEÍCULO
     Wait Until Element Is Visible    ${VEICULO} 
     Click Element    ${VEICULO} 
-
-#clicar no botao inicio
-    Wait Until Element Is Visible   ${BTN_INICIO}
-    Click Element    ${BTN_INICIO}

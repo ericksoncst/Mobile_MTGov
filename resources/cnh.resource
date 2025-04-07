@@ -1,5 +1,5 @@
 *** Settings ***
-Resource  ../common/main.robot
+Resource  ../common/main.resource
 
 *** Variables ***
 ${CNH}  //android.view.ViewGroup[@content-desc="CNH"]
@@ -19,16 +19,13 @@ o usuario esteja logado no APP DETRAN
     clicar no botao entrar
     clicar no botão permitir
 
+
 o usuario clicar na opção CNH
     Wait Until Element Is Visible    ${CNH}
     Click Element    ${CNH}
 
-clicar na opção Segunda Vida
+
+clicar na opção Segunda Via
     Wait Until Element Is Visible    ${SEGUNDA-VIA}  timeout=10s
-    Click Element    ${SEGUNDA-VIA} 
+    Click Element    ${SEGUNDA-VIA}
     Capture Page Screenshot  segunda_via.png
-clicar no botao inicio
-    Wait Until Element Is Visible   ${BTN_INICIO}
-    Click Element   ${BTN_INICIO}
-    
-    

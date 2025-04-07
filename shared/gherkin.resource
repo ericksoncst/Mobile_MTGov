@@ -1,5 +1,5 @@
 *** Settings ***
-Resource  ../common/main.robot
+Resource  ../common/main.resource
 
 *** Keywords ***
 Dado que ${keyword}
@@ -22,3 +22,4 @@ Y ${keyword}
 
 Luego ${keyword}
     Run Keyword  ${keyword}
+    

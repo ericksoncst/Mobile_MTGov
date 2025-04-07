@@ -1,5 +1,5 @@
 *** Settings ***
-Resource    ../common/main.robot
+Resource    ../common/main.resource
 Test Setup    Abrir app
 Test Teardown   fechar app
 
@@ -12,4 +12,4 @@ Cenario 1 : Consulta VEICULO
     VAR  ${letra}    ${USUARIO.NAME}[0:1]    scope=TEST
     Dado que o usuario esteja logado no APP VEICULO
     Quando o usuario clicar na opção VEÍCULO
-    #E clicar no botao inicio
+    
