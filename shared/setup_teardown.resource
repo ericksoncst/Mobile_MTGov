@@ -21,6 +21,7 @@ abrir app
     ...    adbExecTimeout=60000
     ...    autoGrantPermissions=true
     ...    isHeadless=true
+    ...    uiautomator2ServerInstallTimeout=60000
 
     
 
