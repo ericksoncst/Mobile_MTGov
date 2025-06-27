@@ -4,8 +4,10 @@ Resource  ../common/main.resource
 
 ** Variables ***
 ${PLATFORM_NAME}    Android
-${DEVICE_NAME}      emulator-5554 
-${APP_PATH}         C:/MTGOV_MOBILE/Apps/app.apk
+${DEVICE_NAME}      emulator-5554
+${APP_PATH}         C:/MT_APP/app-test/app-tester/apps/app.apk
+${APP_PACKAGE}      br.gov.mt.cepromat.mtcidadao
+${APP_ACTIVITY}     br.gov.mt.cepromat.mtcidadao.MainActivity
 ${APP_PACKAGE}      br.gov.mt.cepromat.mtcidadao
 ${APP_ACTIVITY}     br.gov.mt.cepromat.mtcidadao.MainActivity
 
@@ -22,8 +24,9 @@ abrir app
     ...    autoGrantPermissions=true
     ...    isHeadless=true
     ...    uiautomator2ServerInstallTimeout=60000
+    ...    automationName=UiAutomator2
 
-    
+    Set Appium Timeout    5s
 
 fechar app
     clicar no botao inicio
@@ -35,25 +38,15 @@ fechar app
     o usuario esteja na Home do APP
     Close All Applications
 
-# *** Variables ***
-# ${BROWSERSTACK_USERNAME}      nereucostanoguei1
-# ${BROWSERSTACK_ACCESS_KEY}    qyNiqcXezmuw8A53MkM1
-# ${BROWSERSTACK_APP_URL}       bs://0fdae4713dd6fcbf44b67d703d932f20886a5b72
-# ${DEVICE_NAME}                Google Pixel 7
-# ${PLATFORM_NAME}              Android
-# ${BROWSERSTACK_URL}           https://${BROWSERSTACK_USERNAME}:${BROWSERSTACK_ACCESS_KEY}@hub-cloud.browserstack.com/wd/hub
 
-# *** Keywords ***
-# abrir app
-#     Open Application    ${BROWSERSTACK_URL}
-#     ...    platformName=${PLATFORM_NAME}
-#     ...    deviceName=${DEVICE_NAME}
-#     ...    app=${BROWSERSTACK_APP_URL}
-#     ...    automationName=UiAutomator2
-#     ...    autoGrantPermissions=true
-#     ...    newCommandTimeout=600
-
-# fechar app
-#     Close All Applications
-
-
+Setup Com Login
+    [Arguments]    ${usuario_login}
+    VAR  ${letra}    ${USUARIO.NAME}[0:1]    scope=TEST
+    abrir app
+    o usuario esteja na Home do APP
+    o usuario clicar no botao entrarCom
+    inserir o cpf ${usuario_login.CPF}
+    inserir a senha ${usuario_login.PASSWORD}
+    Hide Keyboard
+    clicar no botao entrar
+    clicar no botão permitir

@@ -3,7 +3,7 @@ Resource  ../common/main.resource
 
 *** Variables ***
 ${SEGURANCA_PUBLICA}  //android.widget.TextView[@text="Segurança Pública"]
-${CAMPO_BUSCAR}   //android.view.View[@text="Lista de Serviços | SYDLE APP"]/android.view.View/android.view.View[2]/android.view.View
+${CAMPO_BUSCAR}   //android.widget.ListView/android.view.View[2]
 
 
 

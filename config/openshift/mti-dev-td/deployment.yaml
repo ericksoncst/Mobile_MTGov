@@ -1,0 +1,36 @@
+---
+apiVersion: "apps/v1"
+kind: "Deployment"
+metadata:
+  name: app-tester
+  labels:
+    app: app-tester
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: app-tester
+  template:
+    metadata:
+      labels:
+        app: app-tester
+    spec:
+      containers:
+        - name: app-tester-container
+          image: image-registry.openshift-image-registry.svc:5000/mti-dev-td/app-tester:latest
+          resources:
+            limits:
+              cpu: 500m
+              memory: 128Mi
+            requests:
+              cpu: 0
+              memory: 0
+          envFrom:
+            - configMapRef:
+                name: app-tester-cfg
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 60
+            periodSeconds: 10

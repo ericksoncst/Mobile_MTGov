@@ -1,0 +1,10 @@
+site_name: "app-tester"
+site_description: "projeto que analiza apks e roda testes automatizados"
+repo_url: https://gitlab.mti.mt.gov.br/transformacao-digital/app-tester
+edit_uri: edit/master/docs
+
+nav:
+  - Início: index.md
+
+plugins:
+  - techdocs-core

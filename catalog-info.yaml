@@ -1,0 +1,23 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: "app-tester"
+  description: "projeto que analiza apks e roda testes automatizados"
+  annotations:
+    gitlab.com/project-slug: transformacao-digital/app-tester
+    'backstage.io/kubernetes-label-selector': 'app=app-tester'
+    sonarqube.org/project-key: transformacao-digital_app-tester
+    backstage.io/techdocs-ref: dir:.
+    backstage.io/code-coverage: scm-only
+  links:
+    
+    - url: https://app-tester.dev.api.interno.mti
+      title: URL interna
+    
+    
+spec:
+  type: service
+  owner: "UGPGD"
+  lifecycle: experimental
+  providesApis:
+    - app-tester-api

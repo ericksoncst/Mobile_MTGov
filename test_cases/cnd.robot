@@ -9,6 +9,7 @@ Test Teardown   fechar app
 Cenario 1 : Consulta CND
     [Tags]  CND
     VAR  ${letra}    ${USUARIO.NAME}[0:1]    scope=TEST
+    Log    Letra capturada: ${letra}
     Dado que o usuario esteja logado no APP CND
     Quando o usuario clicar na opção CND
     E clicar na opção emitir cetidao de debito

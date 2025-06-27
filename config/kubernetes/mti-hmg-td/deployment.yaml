@@ -1,0 +1,36 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-tester
+  labels:
+    app: app-tester
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: app-tester
+  template:
+    metadata:
+      labels:
+        app: app-tester
+    spec:
+      containers:
+        - name: app-tester-container
+          image: southamerica-east1-docker.pkg.dev/plataformagovdigital-gcp-main/mti-hmg-td/app-tester:latest
+          envFrom:
+            - configMapRef:
+                name: app-tester-cfg
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 600
+            periodSeconds: 100
+          resources:
+            limits:
+              cpu: 300m
+              memory: 600Mi
+            requests:
+              cpu: 0
+              memory: 0

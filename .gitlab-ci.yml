@@ -1,0 +1,62 @@
+#######################
+## Deploy GCP         #
+#######################
+
+image: python:3.9
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  DOCKER_IMAGE_NAME: ${CI_PROJECT_NAME}
+
+stages:
+  - image
+  - deploy
+
+# include:
+#   - project: 'templates/template-gitlab-ci'
+#     file: '/FORTIFY.gitlab-ci.yml'
+# Ambiente de Desenvolvimento
+
+### BUILD APP
+
+before_script:
+  - python --version ; pip --version  # For debugging
+  - pip install --upgrade pip
+  - pip install virtualenv
+  - virtualenv venv
+  - source venv/bin/activate
+  - pip install -r requirements.txt
+
+image-dev:
+  stage: image
+  image: registry-gitlab.mti.mt.gov.br/docker-images/docker:dind
+  before_script:
+    - docker info
+    - echo "$GOOGLE_CLOUD_RAW_CREDENTIALS" > key.json
+    - docker login -u _json_key --password-stdin https://southamerica-east1-docker.pkg.dev < key.json
+  script:
+    - docker build --tag "southamerica-east1-docker.pkg.dev/$GCP_PROJECT_NAME/$OPENSHIFT_NAMESPACE_DESENV/$DOCKER_IMAGE_NAME:latest" .
+    - docker push "southamerica-east1-docker.pkg.dev/$GCP_PROJECT_NAME/$OPENSHIFT_NAMESPACE_DESENV/$DOCKER_IMAGE_NAME:latest"
+  only:
+    refs:
+      - develop
+      - temp-migration
+
+deploy-dev:
+  stage: deploy
+  image: registry-gitlab.mti.mt.gov.br/docker-images/google/cloud-sdk:411.0.0
+  before_script:
+  - apt-get update && apt-get install -y python3 python3-pip
+  - python3 --version ; pip3 --version
+  script:
+    - echo "$GOOGLE_CLOUD_RAW_CREDENTIALS" > key.json
+    - gcloud auth activate-service-account --key-file=key.json
+    - gcloud config set project $GCP_PROJECT_NAME
+    - gcloud config set container/cluster $GKE_CLUSTER_NAME
+    - gcloud config set compute/zone $GKE_ZONE
+    - gcloud container clusters get-credentials $GKE_CLUSTER_NAME --zone $GKE_ZONE --project $GCP_PROJECT_NAME
+    - kubectl apply -f config/kubernetes/$OPENSHIFT_NAMESPACE_DESENV/ -n $OPENSHIFT_NAMESPACE_DESENV
+    - kubectl rollout restart deployment/$DOCKER_IMAGE_NAME -n $OPENSHIFT_NAMESPACE_DESENV
+  only:
+    refs:
+      - develop

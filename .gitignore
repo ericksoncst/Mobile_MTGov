@@ -1,4 +1,13 @@
-/output
+# /output
 /Lib
 /Scripts
 /.venv
+/apps/app.apk
+# /test_cases/*.html
+# /test_cases/output.xml
+# /test_cases/report.html
+# /test_cases/log.html
+# /results/
+__pycache__/
+*.pyc
+/apps

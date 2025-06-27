@@ -7,7 +7,7 @@ Library  AppiumLibrary
 Resource  ../shared/gherkin.resource
 Resource  ../shared/setup_teardown.resource
 Resource  ../resources/login.resource
-Resource  ../Data/credenciais.resource
+Resource  ../data/credenciais.resource
 Resource  ../resources/cnh.resource
 Resource  ../resources/painel.resource
 Resource  ../resources/veiculo.resource

@@ -1,0 +1,14 @@
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: app-tester-api
+  description: "projeto que analiza apks e roda testes automatizados"
+spec:
+  type: openapi
+  lifecycle: production
+  owner: "UGPGD"
+  definition:
+    
+    
+    $text: http://app-tester.openapi.cloud.mti.mt.gov.br/api-yaml
+    
