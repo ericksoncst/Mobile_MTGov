@@ -17,7 +17,7 @@ jobs:
       - name: 📦 Instalar dependências do sistema
         run: |
           sudo apt update
-          sudo apt install -y openjdk-11-jdk nodejs npm wget unzip
+          sudo apt install -y openjdk-11-jdk nodejs npm wget unzip netcat
 
       - name: 🐍 Instalar dependências Python
         run: |
@@ -29,12 +29,29 @@ jobs:
           npm install -g appium
           nohup appium --log-level error > appium.log 2>&1 &
 
+      - name: ⏳ Aguardar Appium iniciar
+        run: |
+          for i in {1..10}; do
+            if nc -z localhost 4723; then
+              echo "✅ Appium está rodando!"
+              break
+            else
+              echo "⏳ Aguardando Appium iniciar..."
+              sleep 3
+            fi
+          done
+
+          nc -z localhost 4723 || (echo "❌ Appium não iniciou." && exit 1)
+
+      - name: 🧪 Listar arquivos (debug opcional)
+        run: ls -R .
+
       - name: 🎯 Executar testes com Robot Framework
         run: |
           robot --outputdir results test_cases/
 
-      - name: 📤 Upload dos relatórios
-        uses: actions/upload-artifact@v4
+      - name: 📤 Upload dos relatórios de teste
+        uses: actions/upload-artifact@v3
         with:
           name: robot-results
           path: results/
