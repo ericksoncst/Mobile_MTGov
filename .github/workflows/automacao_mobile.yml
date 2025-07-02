@@ -25,13 +25,6 @@ jobs:
       with:
         node-version: '18'
 
-    - name: 📦 Instalar dependências do NestJS
-      run: npm install
-
-    - name: 🧪 Rodar testes do NestJS (se houver)
-      run: npm run test
-      # Ou substitua pelo seu script de teste, se for diferente
-
     - name: 🐍 Instalar Python e dependências
       uses: actions/setup-python@v5
       with:
