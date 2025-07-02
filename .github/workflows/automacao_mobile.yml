@@ -7,8 +7,9 @@ on:
     branches: [main]
 
 jobs:
-  test:
+  android-tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: 🔄 Checkout do código
@@ -17,12 +18,21 @@ jobs:
       - name: 📦 Instalar dependências do sistema
         run: |
           sudo apt update
-          sudo apt install -y openjdk-11-jdk nodejs npm wget unzip netcat
+          sudo apt install -y openjdk-11-jdk nodejs npm wget unzip netcat-openbsd
 
       - name: 🐍 Instalar dependências Python
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+
+      - name: 📲 Instalar SDK Android e configurar AVD
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          target: default
+          arch: x86_64
+          profile: pixel
+          script: echo "✅ Emulador pronto!"
 
       - name: 🚀 Iniciar Appium Server
         run: |
@@ -43,14 +53,11 @@ jobs:
 
           nc -z localhost 4723 || (echo "❌ Appium não iniciou." && exit 1)
 
-      - name: 🧪 Listar arquivos (debug opcional)
-        run: ls -R .
-
-      - name: 🎯 Executar testes com Robot Framework
+      - name: 🎯 Executar testes Robot Framework
         run: |
           robot --outputdir results test_cases/
 
-      - name: 📤 Upload dos relatórios de teste
+      - name: 📤 Upload dos relatórios
         uses: actions/upload-artifact@v4
         with:
           name: robot-results
