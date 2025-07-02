@@ -17,6 +17,7 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v2
       with:
+        distribution: sdk-tools
         api-level: 30
         target: android-30
         emulator-options: '-no-window -no-audio -no-boot-anim'
