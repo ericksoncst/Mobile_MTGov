@@ -1,20 +1,39 @@
-FROM python:3.11-slim
+FROM ubuntu:20.04
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    unzip \
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Instalar dependências básicas e Node.js (Appium)
+RUN apt-get update && apt-get install -y \
+    openjdk-11-jdk \
     curl \
+    wget \
+    unzip \
+    python3-pip \
+    python3-venv \
+    adb \
+    libgtk-3-0 \
+    xvfb \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir -r /tmp/requirements.txt
+# Instalar Node.js 16 (recomendado para Appium)
+RUN curl -fsSL https://deb.nodesource.com/setup_16.x | bash - && \
+    apt-get install -y nodejs
 
-WORKDIR /tests
+# Instalar Appium e Robot Framework libs
+RUN npm install -g appium
+RUN python3 -m venv /venv
+ENV PATH="/venv/bin:$PATH"
+RUN pip install --upgrade pip
+COPY requirements.txt .
+RUN pip install -r requirements.txt
 
-# Copia tudo dentro do repositório para /tests no container
-COPY . .
+# Copiar APK para dentro do container
+COPY apps/app.apk /apps/app.apk
 
-# Entrypoint
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+# Expor porta padrão do Appium
+EXPOSE 4723
 
-ENTRYPOINT ["/entrypoint.sh"]
+# Start Appium + Xvfb (emulador rodando via X virtual framebuffer)
+CMD Xvfb :99 -screen 0 1280x720x16 & \
+    export DISPLAY=:99 && \
+    appium
