@@ -1,4 +1,4 @@
-name: Testes Robot com Appium
+name: Teste Mobile
 
 on:
   push:
