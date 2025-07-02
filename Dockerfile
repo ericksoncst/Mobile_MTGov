@@ -18,6 +18,9 @@ WORKDIR /tests
 # Copia seus testes
 COPY ./test_cases /tests
 COPY ./common /common
+COPY ./data /data
+COPY ./shared /shared
+COPY ./resources /resources
 
 
 # Copia entrypoint e dá permissão
