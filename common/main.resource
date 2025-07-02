@@ -2,22 +2,24 @@
 Library    AppiumLibrary
 
 *** Variables ***
-${APPIUM_SERVER}    http://localhost:4723/wd/hub
-${DEVICE_NAME}      Android Emulator
-${PLATFORM_NAME}    Android
-${APP_PATH}         /apps/app.apk
+${BROWSERSTACK_USERNAME}   ${BROWSERSTACK_USERNAME}
+${BROWSERSTACK_ACCESS_KEY} ${BROWSERSTACK_ACCESS_KEY}
+${APPIUM_SERVER}           https://${BROWSERSTACK_USERNAME}:${BROWSERSTACK_ACCESS_KEY}@hub-cloud.browserstack.com/wd/hub
+${APP_ID}                  ${APP_ID}
+${CAPABILITIES}            platformName=Android
+...                        device=Google Pixel 3
+...                        app=${APP_ID}
+...                        automationName=UiAutomator2
+...                        browserstack.debug=true
 
 *** Keywords ***
 Abrir app
-    Log    Abrindo o app no Appium
-    Open Application    ${APPIUM_SERVER}
-    ...    platformName=${PLATFORM_NAME}
-    ...    deviceName=${DEVICE_NAME}
-    ...    app=${APP_PATH}
+    Log    Abrindo app no BrowserStack Appium
+    Open Application    ${APPIUM_SERVER}    ${CAPABILITIES}
     Log    App aberto com sucesso
 
 fechar app
-    Log    Fechando o app
+    Log    Fechando app
     Close Application
 
 
