@@ -17,6 +17,8 @@ WORKDIR /tests
 
 # Copia seus testes
 COPY ./test_cases /tests
+COPY ./common /common
+
 
 # Copia entrypoint e dá permissão
 COPY entrypoint.sh /entrypoint.sh
