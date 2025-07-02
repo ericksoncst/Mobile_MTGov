@@ -2,47 +2,37 @@ name: Mobile Automation CI
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
   test:
     runs-on: ubuntu-latest
 
+    env:
+      ANDROID_HOME: /usr/lib/android-sdk
+      PATH: /usr/lib/android-sdk/platform-tools:/usr/lib/android-sdk/cmdline-tools:$PATH
+
     steps:
       - name: 🛎️ Checkout do código
-        uses:  actions/upload-artifact@v3
+        uses: actions/checkout@v4
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: my-artifact
-          path: ./path/to/artifact
-
-        
       - name: 📦 Instalar dependências
         run: |
           sudo apt update
-          sudo apt install -y openjdk-11-jdk android-sdk wget unzip
+          sudo apt install -y openjdk-11-jdk nodejs npm wget unzip
           pip install robotframework robotframework-appiumlibrary
 
       - name: 📥 Configurar Android SDK
-        env:
-          ANDROID_SDK_ROOT: /usr/lib/android-sdk
         run: |
-          echo "export ANDROID_HOME=$ANDROID_SDK_ROOT" >> $HOME/.bashrc
-          echo "export PATH=$ANDROID_SDK_ROOT/platform-tools:$ANDROID_SDK_ROOT/cmdline-tools:$PATH" >> $HOME/.bashrc
-          source $HOME/.bashrc
-          sdkmanager --install "platform-tools" "platforms;android-30" "build-tools;30.0.3"
+          echo "y" | sudo sdkmanager --install "platform-tools" "platforms;android-30" "build-tools;30.0.3"
           adb devices
 
       - name: 🚀 Iniciar Appium Server
         run: |
           npm install -g appium
-          appium --log-level error > appium.log 2>&1 &
+          nohup appium --log-level error > appium.log 2>&1 &
 
       - name: 🎯 Executar testes com Robot Framework
         run: |
