@@ -1,1 +1,2 @@
 # No APK files tracked by LFS
+*.apk filter=lfs diff=lfs merge=lfs -text
