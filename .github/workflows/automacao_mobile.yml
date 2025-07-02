@@ -51,7 +51,7 @@ jobs:
           robot --outputdir results test_cases/
 
       - name: 📤 Upload dos relatórios de teste
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: robot-results
           path: results/
