@@ -1,64 +1,52 @@
-name: Mobile Automation CI
+name: CI Pipeline
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
   pull_request:
-    branches: [main]
+    branches: [ main ]
 
 jobs:
-  android-tests:
+  test:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+
+    services:
+      docker:
+        image: selenium/standalone-chrome
+        options: >-
+          --shm-size=2g
 
     steps:
-      - name: 🔄 Checkout do código
-        uses: actions/checkout@v4
+    - name: ⬇️ Checkout do código
+      uses: actions/checkout@v4
 
-      - name: 📦 Instalar dependências do sistema
-        run: |
-          sudo apt update
-          sudo apt install -y openjdk-11-jdk nodejs npm wget unzip netcat-openbsd
+    - name: ⚙️ Instalar Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
 
-      - name: 🐍 Instalar dependências Python
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+    - name: 📦 Instalar dependências do NestJS
+      run: npm install
 
-      - name: 📲 Instalar SDK Android e configurar AVD
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 30
-          target: default
-          arch: x86_64
-          profile: pixel
-          script: echo "✅ Emulador pronto!"
+    - name: 🧪 Rodar testes do NestJS (se houver)
+      run: npm run test
+      # Ou substitua pelo seu script de teste, se for diferente
 
-      - name: 🚀 Iniciar Appium Server
-        run: |
-          npm install -g appium
-          nohup appium --log-level error > appium.log 2>&1 &
+    - name: 🐍 Instalar Python e dependências
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
 
-      - name: ⏳ Aguardar Appium iniciar
-        run: |
-          for i in {1..10}; do
-            if nc -z localhost 4723; then
-              echo "✅ Appium está rodando!"
-              break
-            else
-              echo "⏳ Aguardando Appium iniciar..."
-              sleep 3
-            fi
-          done
+    - name: 📦 Instalar dependências Python
+      run: |
+        python -m pip install --upgrade pip
+        pip install robotframework robotframework-appiumlibrary
 
-          nc -z localhost 4723 || (echo "❌ Appium não iniciou." && exit 1)
+    - name: ▶️ Start do Appium
+      run: |
+        npm install -g appium
+        appium --log-level error &
+        sleep 5
 
-      - name: 🎯 Executar testes Robot Framework
-        run: |
-          robot --outputdir results test_cases/
-
-      - name: 📤 Upload dos relatórios
-        uses: actions/upload-artifact@v4
-        with:
-          name: robot-results
-          path: results/
+    - name: 🤖 Rodar testes Robot Framework
+      run: robot test_cases/
