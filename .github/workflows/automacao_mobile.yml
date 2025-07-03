@@ -9,54 +9,54 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout source code
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Install Python
       - name: Set up Python 3.9
         uses: actions/setup-python@v5
         with:
           python-version: 3.9
 
-      # 3. Install Robot Framework
       - name: Install Robot Framework & AppiumLibrary
         run: |
           pip install --upgrade pip
           pip install robotframework
           pip install robotframework-appiumlibrary
 
-      # 4. Set up Node.js and Appium
-      - name: Set up Node.js
+      - name: Set up Node.js & Appium
         uses: actions/setup-node@v3
         with:
           node-version: 'lts/*'
-
-      - name: Install Appium and drivers
+      - name: Install Appium & drivers
         run: |
           npm install -g appium
           appium driver install uiautomator2
-          npm install -g appium-inspector
-          appium driver doctor uiautomator2
 
-      # 5. Set up Java (JDK)
-      - name: Set up Java JDK
+      - name: Install media tools & bundletool
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg gstreamer1.0-tools openjdk-17-jdk curl
+          curl -Lo /usr/local/bin/bundletool.jar https://github.com/google/bundletool/releases/latest/download/bundletool.jar
+          sudo chmod +x /usr/local/bin/bundletool.jar
+
+      - name: Set up Java
         uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      # 6. Set up Android SDK
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      # 7. Start Appium server
+      - name: Verify Appium setup
+        run: |
+          appium driver doctor uiautomator2 || echo "Doctor reported warnings, but build will continue."
+
       - name: Start Appium Server
         run: |
           nohup appium -p 4723 -pa /wd/hub --log-timestamp --local-timezone > appium.log 2>&1 &
 
-      # 8. Run Emulator and Robot tests
-      - name: Run Emulator and Execute Robot Framework Tests
+      - name: Run Emulator and Execute Robot Tests
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 30
@@ -65,24 +65,15 @@ jobs:
           profile: pixel_4
           disable-animations: true
           script: |
-            echo "Waiting for emulator to boot..."
             adb wait-for-device
-            until adb shell getprop sys.boot_completed | grep -m 1 "1"; do
-              echo "Still waiting for boot..."
-              sleep 5
-            done
-
-            echo "Unlocking emulator..."
-            adb shell input keyevent 82 || echo "Unlock skipped"
-
-            echo "Running Robot Framework test..."
+            until adb shell getprop sys.boot_completed | grep -m 1 "1"; do sleep 5; done
+            adb shell input keyevent 82 || true
             robot -d reports \
               -v APPIUM_PORT:4723 \
               -v PLATFORM_VERSION:11.0 \
               -v DEVICE_NAME:Pixel_4_API_30 \
               test_cases/
 
-      # 9. Upload test results
       - name: Upload Robot Framework reports
         uses: actions/upload-artifact@v4
         if: always()
