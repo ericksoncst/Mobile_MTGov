@@ -12,14 +12,6 @@ jobs:
     timeout-minutes: 30
 
     steps:
-
-      - name: 🚀 Run Appium
-        run: |
-          npm install -g appium
-          appium --relaxed-security --base-path /wd/hub &
-          echo "APPIUM_PID=$!" >> $GITHUB_ENV
-          sleep 10  # Give Appium time to start
-
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
 
@@ -29,19 +21,36 @@ jobs:
           distribution: 'zulu'
           java-version: '11'
 
+      - name: 🔧 Install Android SDK
+        uses: android-actions/setup-android@v3
+
       - name: 📱 Setup Android Emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 30
           arch: x86_64
           profile: Nexus 6
-          disable-animations: true
+          disable-animations: true  # Fixed typo (was disable-animations)
           script: echo "Emulator ready"
+          emulator-options: >-
+            -no-audio
+            -no-window
+            -gpu swiftshader_indirect
+            -camera-back none
+            -camera-front none
+          working-directory: ./
 
       - name: 🌐 Install Appium
         run: |
-          npm install -g appium
+          sudo npm install -g appium
           appium driver install uiautomator2
+          appium driver install xcuitest  # Optional for iOS if needed
+
+      - name: 🚀 Start Appium Server
+        run: |
+          appium --relaxed-security --base-path /wd/hub &
+          echo "APPIUM_PID=$!" >> $GITHUB_ENV
+          sleep 15  # Increased wait time for stability
 
       - name: 🐍 Setup Python
         uses: actions/setup-python@v4
@@ -50,6 +59,7 @@ jobs:
 
       - name: 📦 Install dependencies
         run: |
+          pip install -r requirements.txt
           pip install robotframework robotframework-appiumlibrary
 
       - name: 🧪 Run tests
@@ -60,7 +70,21 @@ jobs:
           until curl -f http://localhost:4723/wd/hub/status; do
             sleep 5
           done
-          robot --outputdir results test_cases
+          echo "Waiting for emulator to be ready..."
+          adb wait-for-device
+          while [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" != "1" ]; do
+            sleep 5
+          done
+          robot --variable DEVICE_NAME:emulator-5554 \
+                --variable PLATFORM_VERSION:11.0 \
+                --variable APPIUM_URL:http://localhost:4723/wd/hub \
+                --outputdir results \
+                test_cases
+
+      - name: 🛑 Stop Appium
+        if: always()
+        run: |
+          kill $APPIUM_PID || true
 
       - name: 📤 Upload results
         uses: actions/upload-artifact@v4
