@@ -17,7 +17,7 @@ jobs:
           python-version: 3.9
           cache: 'pip'
 
-      - name: Install Python dependencies
+      - name: Install Robot and Appium dependencies
         run: |
           pip install -r requirements.txt
           pip install robotframework
@@ -29,7 +29,7 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Set up Android SDK
+      - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
       - name: Set up Node.js
@@ -42,11 +42,11 @@ jobs:
           npm install -g appium
           appium driver install uiautomator2
 
-      - name: Start Appium Server
+      - name: Start Appium
         run: |
-          nohup appium -p 4725 -pa /wd/hub --log-timestamp --local-timezone > appium.log 2>&1 &
+          nohup appium -p 4555 -pa /wd/hub --log-timestamp > appium.log 2>&1 &
 
-      - name: Run Android Emulator + Install APK + Run Tests
+      - name: Run Emulator + Robot Tests
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 30
@@ -55,25 +55,13 @@ jobs:
           profile: pixel_4
           disable-animations: true
           script: |
-            echo "Waiting for boot..."
-            adb wait-for-device
-            until adb shell getprop sys.boot_completed | grep -m 1 "1"; do
-              echo "Waiting for sys.boot_completed...";
-              sleep 5
-            done
+            echo "Running Robot tests against built-in Clock app..."
+            robot -d ./reports \
+              -v APPIUM_PORT:4555 \
+              -v PLATFORM_VERSION:11.0 \
+              -v DEVICE_NAME:"Pixel_4_API_30" \
+              test_cases/
 
-            echo "Waiting a bit more for system to stabilize..."
-            sleep 10
-
-            echo "Unlocking screen..."
-            adb shell input keyevent 82
-
-            echo "Installing APK..."
-            adb install -t -g apps/app.apk
-
-            echo "Running tests..."
-            robot -d ./reports -v APPIUM_PORT:4725 test_cases/
-     
       - name: Upload test results
         uses: actions/upload-artifact@v4
         if: always()
