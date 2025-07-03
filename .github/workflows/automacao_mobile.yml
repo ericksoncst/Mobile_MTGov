@@ -1,4 +1,4 @@
-name: Testes Mobile com Android Emulator
+name: Testes Android com Emulador
 
 on:
   push:
@@ -7,49 +7,31 @@ on:
     branches: [main]
 
 jobs:
-  test:
+  robot-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
     steps:
-      - name: 📥 Checkout do repositório
+      - name: 🧾 Checkout do código
         uses: actions/checkout@v4
 
-      - name: 📦 Instalar dependências Android, Appium e rodar testes
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 31
-          target: google_apis
-          arch: x86_64
-          force-avd-creation: true
-          script: |
-            echo "⚙️ Iniciando Appium localmente..."
-            npm install -g appium
-            appium --log-level error &
+      - name: 🐳 Build da imagem Docker
+        run: |
+          docker build -t robot-tests .
 
-            echo "🐍 Instalando dependências Python"
-            python -m pip install --upgrade pip
-            pip install robotframework robotframework-appiumlibrary Appium-Python-Client==3.1.0
-            pip install robotframework-datadriver
+      - name: ▶️ Executar testes no container
+        run: |
+          docker run --name emulador-testes robot-tests
 
-            echo "📱 Instalando APK"
-            adb install $(pwd)/apps/app.apk
+      - name: 📁 Copiar resultados do container
+        run: |
+          docker cp emulador-testes:/app/tests/results ./results
 
-            echo "🧪 Rodando testes"
-            robot --outputdir results \
-              --variable REMOTE_URL:"http://localhost:4723/wd/hub" \
-              --variable PLATFORM_NAME:"Android" \
-              --variable DEVICE_NAME:"emulator-5554" \
-              --variable APP:"$(pwd)/apps/app.apk" \
-              --variable APP_PACKAGE:"br.gov.mt.cepromat.mtcidadao" \
-              --variable APP_ACTIVITY:"br.gov.mt.cepromat.mtcidadao.MainActivity" \
-              test_cases/
-
-      - name: 📂 Upload dos resultados
+      - name: 📤 Upload dos relatórios do Robot Framework
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: resultados
+          name: resultados-robot
           path: |
             results/output.xml
             results/report.html
