@@ -24,12 +24,12 @@ RUN mkdir -p ${ANDROID_HOME}/cmdline-tools && \
 RUN ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --version
 
 # Instala SDKs necessários
-RUN yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --licenses && \
-    ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager \
+RUN yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --sdk_root="${ANDROID_HOME}" --licenses || true && \
+    ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --sdk_root="${ANDROID_HOME}" \
         "platform-tools" \
         "platforms;android-30" \
         "system-images;android-30;google_apis;armeabi-v7a" \
-        "emulator"
+        "emulator" || true
 
 # Cria o AVD com imagem ARM (evita problema com KVM)
 RUN echo "no" | ${ANDROID_HOME}/cmdline-tools/latest/bin/avdmanager \
