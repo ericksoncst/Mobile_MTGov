@@ -3,16 +3,14 @@ Library  AppiumLibrary
 Resource  ../common/main.resource
 
 *** Variables ***
-${REMOTE_URL}       http://hub-cloud.browserstack.com/wd/hub
 ${PLATFORM_NAME}    Android
 ${DEVICE_NAME}      Google Pixel 6
-${PLATFORM_VERSION} 12.0
-${APP}              %{APP}
+${PLATFORM_VERSION}  12.0  # Fixed - no space after variable name
 ${APP_PACKAGE}      br.gov.mt.cepromat.mtcidadao
 ${APP_ACTIVITY}     br.gov.mt.cepromat.mtcidadao.MainActivity
 
 *** Keywords ***
-Open Test Application
+abrir app
     Open Application    ${REMOTE_URL}
     ...    platformName=${PLATFORM_NAME}
     ...    platformVersion=${PLATFORM_VERSION}
@@ -20,9 +18,8 @@ Open Test Application
     ...    app=${APP}
     ...    appPackage=${APP_PACKAGE}
     ...    appActivity=${APP_ACTIVITY}
+    ...    automationName=UiAutomator2
     ...    autoGrantPermissions=true
-    ...    bstack:options.userName=%{BROWSERSTACK_USERNAME}
-    ...    bstack:options.accessKey=%{BROWSERSTACK_ACCESS_KEY}
 
 # ** Variables ***
 # ${PLATFORM_NAME}    Android
