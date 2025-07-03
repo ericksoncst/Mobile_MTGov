@@ -9,7 +9,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
 
     steps:
       - name: 📥 Checkout repository
@@ -31,30 +31,19 @@ jobs:
           arch: x86_64
           profile: Nexus 6
           disable-animations: true
-          script: |
-            echo "Waiting for device to be ready..."
-            adb wait-for-device
-            echo "Checking boot completion..."
-            while [[ "$(adb shell getprop sys.boot_completed | tr -d '\r')" != "1" ]]; do
-              sleep 5
-              echo "Waiting for boot completion..."
-            done
-            echo "Emulator is fully ready"
+          script: echo "Emulator is starting"
 
-      - name: 📱 Install APK (with retry)
+      - name: ⏳ Wait for emulator
         run: |
-          for i in {1..5}; do
-            if adb install apps/app.apk; then
-              echo "APK installed successfully"
-              break
-            else
-              echo "Attempt $i failed, retrying..."
-              sleep 10
-              adb kill-server
-              adb start-server
-            fi
-          done
-          sleep 15
+          echo "Waiting for device to be ready..."
+          adb wait-for-device
+          sleep 30  # Fixed wait time instead of loop
+          echo "Proceeding with tests"
+
+      - name: 📱 Install APK
+        run: |
+          adb install apps/app.apk
+          sleep 10
 
       - name: 🌐 Start Appium server
         run: |
@@ -65,9 +54,6 @@ jobs:
 
       - name: 🧪 Run tests
         run: |
-          adb devices
-          curl -s http://localhost:4723/wd/hub/status || (cat appium.log && exit 1)
-          
           robot --variable REMOTE_URL:http://localhost:4723/wd/hub \
                 --variable PLATFORM_NAME:Android \
                 --variable DEVICE_NAME:emulator-5554 \
