@@ -1,80 +1,88 @@
-name: Android Emulator Tests
+name: Continuous Integration
 
 on:
   push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
 
 jobs:
-  test:
+  execute_test:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
 
     steps:
-      - name: 📥 Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: 🛠️ Setup Android Environment
+      - name: Use Python 3.9
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.9
+          cache: 'pip'
+
+      - name: Install Robot Framework and dependencies
+        run: |
+          pip install robotframework
+          pip install robotframework-appiumlibrary
+          pip install -r requirements.txt
+
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: 🐍 Set up Python
-        uses: actions/setup-python@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
         with:
-          python-version: '3.10'
+          node-version: 'lts/*'
 
-      - name: 📦 Install dependencies
+      - name: Install Appium
         run: |
-          pip install robotframework robotframework-appiumlibrary
-          sudo apt-get update && sudo apt-get install -y adb
+          npm install -g appium
 
-      - name: 🚀 Start Emulator and Run Tests
-        uses: ReactiveCircus/android-emulator-runner@v2
+      - name: Install UiAutomator2
+        run: |
+          appium driver install uiautomator2
+
+      - name: Start up Appium
+        run: |
+          nohup appium -p 4725 -pa /wd/hub &
+
+      - name: Install Android SDK system image
+        run: |
+          sdkmanager --install "system-images;android-34;google_apis;x86_64"
+
+      - name: Create Device
+        run: |
+          echo no | avdmanager create avd -n "Pixel_7_Pro_API_34" -k "system-images;android-34;google_apis;x86_64" -d pixel_7_pro
+
+      - name: Enable KVM group perms
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run Android Emulator and execute Robot tests
+        uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 30
+          api-level: 34
           target: google_apis
           arch: x86_64
-          force-avd-creation: true
-          emulator-options: -no-window -gpu swiftshader_indirect -no-audio -no-snapshot -no-boot-anim
+          profile: pixel_6_pro
           script: |
-            # Wait for emulator (simplified robust approach)
-            echo "Waiting for emulator..."
+            avdmanager list device
+            # Start emulator
+            emulator -avd Pixel_7_Pro_API_34 -no-audio -no-window -no-snapshot -no-boot-anim &
             adb wait-for-device
-            sleep 45  # Extended fixed wait time
-
-            # Bypass service initialization errors
-            echo "Skipping problematic service initialization"
-
             # Install APK
-            echo "Installing APK..."
-            adb install "$(pwd)/apps/app.apk" || \
-            (adb install -r -t "$(pwd)/apps/app.apk" && sleep 15)
+            adb install apps/app.apk
+            # Run Robot Framework tests
+            robot -d ./reports -v APPIUM_PORT:4725 -v APK_PATH:apps/app.apk test_cases/
 
-            # Start Appium
-            echo "Starting Appium..."
-            npm install -g appium
-            appium driver install uiautomator2
-            appium --relaxed-security --base-path /wd/hub > appium.log 2>&1 &
-            sleep 20
-
-            # Run tests
-            echo "Running tests..."
-            robot --variable REMOTE_URL:http://localhost:4723/wd/hub \
-                  --variable PLATFORM_NAME:Android \
-                  --variable DEVICE_NAME:emulator-5554 \
-                  --variable APP_PACKAGE:br.gov.mt.cepromat.mtcidadao \
-                  --variable APP_ACTIVITY:br.gov.mt.cepromat.mtcidadao.MainActivity \
-                  --outputdir results \
-                  test_cases/
-
-            # Proper shutdown
-            adb emu kill
-
-      - name: 📤 Upload test results
+      - name: Upload test results
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-results
-          path: |
-            results/
-            appium.log
+          name: reports
+          path: reports
