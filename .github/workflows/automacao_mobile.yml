@@ -15,7 +15,7 @@ jobs:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
 
-      - name: 🛠️ Setup Android SDK
+      - name: 🛠️ Setup Android Environment
         uses: android-actions/setup-android@v3
 
       - name: 🐍 Set up Python
@@ -26,31 +26,34 @@ jobs:
       - name: 📦 Install dependencies
         run: |
           pip install robotframework robotframework-appiumlibrary
-          sudo apt-get -y install adb
+          sudo apt-get update && sudo apt-get install -y adb
 
-      - name: 🔧 Start emulator and run tests
+      - name: 🚀 Start Emulator and Run Tests
         uses: ReactiveCircus/android-emulator-runner@v2
         with:
           api-level: 30
           target: google_apis
           arch: x86_64
-          profile: Nexus 6
-          disable-animations: true
+          profile: Pixel_4
+          disable-animations: false  # Disabled problematic animation setting
           script: |
-            # Verify ADB
-            echo "ADB path: $(which adb)"
-            adb --version
-            
+            # Wait for emulator to fully boot
+            adb wait-for-device
+            while [[ "$(adb shell getprop sys.boot_completed | tr -d '\r')" != "1" ]]; do
+              sleep 5
+              echo "Waiting for emulator to boot..."
+            done
+
             # Install APK
-            adb install apps/app.apk
+            adb install -t apps/app.apk
             sleep 10
-            
+
             # Start Appium
             npm install -g appium
             appium driver install uiautomator2
             appium --relaxed-security --base-path /wd/hub > appium.log 2>&1 &
             sleep 15
-            
+
             # Run tests
             robot --variable REMOTE_URL:http://localhost:4723/wd/hub \
                   --variable PLATFORM_NAME:Android \
