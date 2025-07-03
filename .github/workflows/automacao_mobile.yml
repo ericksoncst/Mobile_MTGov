@@ -1,4 +1,4 @@
-name: Testes Mobile com BrowserStack
+name: Mobile Tests (Local Emulator)
 
 on:
   push:
@@ -9,54 +9,25 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
 
     steps:
-      - name: 📥 Checkout do repositório
+      - name: 📥 Checkout repository
         uses: actions/checkout@v4
 
-      - name: 🐍 Configurar ambiente Python
-        run: |
-          python -m pip install --upgrade pip
-          pip install robotframework robotframework-appiumlibrary Appium-Python-Client==3.1.0
-          pip install robotframework-datadriver  # Se necessário para seus testes
+      - name: 🐳 Build Docker image
+        run: docker build -t mobile-tests .
 
-      - name: ▶️ Rodar testes Robot Framework
-        env:
-          BROWSERSTACK_USERNAME: ${{ secrets.BROWSERSTACK_USERNAME }}
-          BROWSERSTACK_ACCESS_KEY: ${{ secrets.BROWSERSTACK_ACCESS_KEY }}
-          BUILD_NUMBER: ${{ github.run_number }}
-          REMOTE_URL: "http://${{ secrets.BROWSERSTACK_USERNAME }}:${{ secrets.BROWSERSTACK_ACCESS_KEY }}@hub-cloud.browserstack.com/wd/hub"
-          PLATFORM_NAME: Android
-          DEVICE_NAME: "Google Pixel 6"
-          OS_VERSION: "12.0"
-          APP: "bs://ed8b433969d8752cbfacffdbe01efa5e4e1823b5"
-          APP_PACKAGE: br.gov.mt.cepromat.mtcidadao
-          APP_ACTIVITY: br.gov.mt.cepromat.mtcidadao.MainActivity
+      - name: 🚀 Run tests
         run: |
-          echo "🔍 Verificando variáveis de ambiente:"
-          echo "REMOTE_URL: $REMOTE_URL"
-          echo "APP: $APP"
-          
-          robot --outputdir results \
-            --variable REMOTE_URL:"$REMOTE_URL" \
-            --variable PLATFORM_NAME:"$PLATFORM_NAME" \
-            --variable DEVICE_NAME:"$DEVICE_NAME" \
-            --variable PLATFORM_VERSION:"$OS_VERSION" \
-            --variable APP:"$APP" \
-            --variable APP_PACKAGE:"$APP_PACKAGE" \
-            --variable APP_ACTIVITY:"$APP_ACTIVITY" \
-            --variable BROWSERSTACK_USERNAME:"$BROWSERSTACK_USERNAME" \
-            --variable BROWSERSTACK_ACCESS_KEY:"$BROWSERSTACK_ACCESS_KEY" \
-            --variable BUILD_NUMBER:"$BUILD_NUMBER" \
-            test_cases/
+          docker run --rm \
+            -v $(pwd)/results:/app/results \
+            -v $(pwd)/apps:/app/apps \
+            mobile-tests
 
-      - name: 📂 Upload dos resultados
+      - name: 📤 Upload test results
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: resultados
-          path: |
-            results/output.xml
-            results/report.html
-            results/log.html
+          name: test-results
+          path: results/
