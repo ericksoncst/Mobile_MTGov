@@ -4,7 +4,7 @@
 <test id="s1-t1" name="Cenario 1 : Consulta CARTERIA DE AUTISTA" line="9">
 <kw name="abrir app" owner="setup_teardown" type="SETUP">
 <kw name="Open Application" owner="AppiumLibrary">
-<arg>http://localhost:4723/wd/hub</arg>
+<arg>http://127.0 0.1:4723/wd/hub</arg>
 <arg>deviceName=${DEVICE_NAME}</arg>
 <arg>platformName=${PLATFORM_NAME}</arg>
 <arg>app=${APP_PATH}</arg>
