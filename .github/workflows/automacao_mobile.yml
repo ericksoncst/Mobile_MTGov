@@ -29,7 +29,7 @@ jobs:
           REMOTE_URL: "http://${{ secrets.BROWSERSTACK_USERNAME }}:${{ secrets.BROWSERSTACK_ACCESS_KEY }}@hub-cloud.browserstack.com/wd/hub"
           PLATFORM_NAME: Android
           DEVICE_NAME: "Google Pixel 6"
-          OS_VERSION: 12.0
+          OS_VERSION: "12.0"
           APP: "bs://ed8b433969d8752cbfacffdbe01efa5e4e1823b5"
           APP_PACKAGE: br.gov.mt.cepromat.mtcidadao
           APP_ACTIVITY: br.gov.mt.cepromat.mtcidadao.MainActivity
