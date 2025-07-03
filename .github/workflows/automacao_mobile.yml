@@ -26,15 +26,17 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: '17'
-
+          
       - name: 📱 Iniciar Emulador Android
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 30
-          arch: x86_64
+          arch: x86
           profile: Nexus 6
           disable-animations: true
+          emulator-options: "-no-snapshot-save -no-boot-anim -no-window -no-metrics"
           script: echo "✅ Emulador iniciado"
+
 
       - name: 🐍 Instalar dependências Python
         run: |
