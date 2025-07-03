@@ -10,45 +10,25 @@ jobs:
   android-tests:
     runs-on: ubuntu-latest
     container:
-      image: docker:dind
+      image: your-custom-image
       options: --privileged
-
-    services:
-      appium:
-        image: appium/appium
-        ports:
-          - 4723:4723
 
     steps:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
 
-      - name: 🔍 Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-
-      - name: 📦 Install dependencies
-        run: |
-          pip install -r requirements.txt
-          pip install robotframework robotframework-appiumlibrary
-
-      - name: 🔌 Start ADB server
-        run: |
-          sudo apt-get update && sudo apt-get install -y android-tools-adb
-          adb start-server
-
-      - name: 🧪 Run tests
-        run: |
-          echo "🎯 Running tests with Robot Framework"
-          robot --outputdir results/ tests/
+      - name: 🐳 Run tests
+        run: docker run \
+          --name test-runner \
+          -v $(pwd)/results:/app/results \
+          -e APPIUM_HOST=localhost \
+          -e APPIUM_PORT=4723 \
+          --rm \
+          your-custom-image
 
       - name: 📤 Upload test results
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: test-results
-          path: |
-            results/output.xml
-            results/report.html
-            results/log.html
+          path: results/*
