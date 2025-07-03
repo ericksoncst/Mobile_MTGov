@@ -55,7 +55,9 @@ jobs:
           arch: x86_64
           profile: pixel_4
           disable-animations: false
-          script: .github/scripts/run-tests.sh
+          script:  |
+            chmod +x .github/scripts/run-tests.sh
+            .github/scripts/run-tests.sh
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
