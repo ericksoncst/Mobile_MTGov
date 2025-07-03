@@ -1,43 +1,25 @@
-name: Android RobotFramework Automation
+name: Continuous Integration
 
 on:
   push:
   workflow_dispatch:
 
 jobs:
-  robot-tests:
+  execute_test:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python 3.9
+      - name: Use Python 3.9
         uses: actions/setup-python@v5
         with:
           python-version: 3.9
+          cache: 'pip'
 
-      - name: Install Robot Framework & AppiumLibrary
-        run: |
-          pip install --upgrade pip
-          pip install robotframework
-          pip install robotframework-appiumlibrary
-
-      - name: Set up Node.js & Appium
-        uses: actions/setup-node@v3
-        with:
-          node-version: 'lts/*'
-      - name: Install Appium & drivers
-        run: |
-          npm install -g appium
-          appium driver install uiautomator2
-
-      - name: Install media tools & bundletool
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg gstreamer1.0-tools openjdk-17-jdk curl
-          curl -Lo /usr/local/bin/bundletool.jar https://github.com/google/bundletool/releases/latest/download/bundletool.jar
-          sudo chmod +x /usr/local/bin/bundletool.jar
+      - name: Install Dependencies
+        run:
+          pip install -r requirements.txt
 
       - name: Set up Java
         uses: actions/setup-java@v3
@@ -45,39 +27,54 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Set up Android SDK
+      - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Verify Appium setup
-        run: |
-          appium driver doctor uiautomator2 || echo "Doctor reported warnings, but build will continue."
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 'lts/*'
 
-      - name: Start Appium Server
+      - name: Install Appium
         run: |
-          nohup appium -p 4723 -pa /wd/hub --log-timestamp --local-timezone > appium.log 2>&1 &
+          npm install -g appium
 
-      - name: Run Emulator and Execute Robot Tests
+      - name: Install UiAutomator2
+        run: |
+          appium driver install uiautomator2
+
+      - name: Start up Appium
+        run: |
+          nohup appium -p 4725 -pa /wd/hub &
+
+      - name: Install Android SDK system image
+        run: |
+          sdkmanager --install "system-images;android-34;google_apis;x86_64"
+
+      - name: Create Device
+        run: |
+          echo no | avdmanager create avd -n "Pixel_7_Pro_API_34" -k "system-images;android-34;google_apis;x86_64" -d pixel_7_pro
+
+      - name: Enable KVM group perms
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run Android Emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 30
+          api-level: 34
           target: google_apis
           arch: x86_64
-          profile: pixel_4
+          profile: pixel_6_pro
           script: |
-            adb wait-for-device
-            until adb shell getprop sys.boot_completed | grep -m 1 "1"; do sleep 5; done
-            adb shell input keyevent 82 || true
-            robot -d reports \
-              -v APPIUM_PORT:4723 \
-              -v PLATFORM_VERSION:11.0 \
-              -v DEVICE_NAME:Pixel_4_API_30 \
-              test_cases/
+            avdmanager list device
+            robot -d ./reports -v APPIUM_PORT:4725 .
 
-      - name: Upload Robot Framework reports
+      - name: Upload test results
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: robot-reports
-          path: |
-            reports/
-            appium.log
+          name: reports
+          path: reports
