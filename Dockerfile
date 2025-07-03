@@ -6,7 +6,9 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Install dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+        ca-certificates \
         curl \
+        gnupg \
         python3-pip \
         python3-venv \
         android-tools-adb \
@@ -25,8 +27,11 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Install Node.js 16.x (LTS) which is more stable for Appium
-RUN curl -fsSL https://deb.nodesource.com/setup_16.x | bash - && \
+# Install Node.js 18.x (current LTS) using nodesource setup script
+RUN mkdir -p /etc/apt/keyrings && \
+    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg && \
+    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_18.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list && \
+    apt-get update && \
     apt-get install -y nodejs && \
     npm install -g npm@latest
 
@@ -62,7 +67,7 @@ RUN echo "no" | ${ANDROID_HOME}/cmdline-tools/latest/bin/avdmanager \
     --device "pixel_4" --force
 
 # Install Appium with specific stable version and its dependencies
-RUN npm install -g appium@2.0.0 && \
+RUN npm install -g appium@2.9.0 && \
     npm install -g appium-doctor && \
     appium driver install uiautomator2 && \
     appium driver install xcuitest
