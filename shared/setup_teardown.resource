@@ -1,14 +1,14 @@
 *** Settings ***
-Library  AppiumLibrary
-Resource  ../common/main.resource
+Library    AppiumLibrary
+Resource   ../common/main.resource
 
 *** Variables ***
-${REMOTE_URL}       http://localhost:4723/wd/hub
-${PLATFORM_NAME}    Android
-${DEVICE_NAME}      emulator-5554
-${APP}              /app/apps/app.apk
-${APP_PACKAGE}      br.gov.mt.cepromat.mtcidadao
-${APP_ACTIVITY}     br.gov.mt.cepromat.mtcidadao.MainActivity
+${REMOTE_URL}        http://localhost:4723/wd/hub
+${PLATFORM_NAME}     Android
+${DEVICE_NAME}       emulator-5554
+${APP}               apps/app.apk
+${APP_PACKAGE}       br.gov.mt.cepromat.mtcidadao
+${APP_ACTIVITY}      br.gov.mt.cepromat.mtcidadao.MainActivity
 
 *** Keywords ***
 abrir app
@@ -20,9 +20,9 @@ abrir app
     ...    appActivity=${APP_ACTIVITY}
     ...    automationName=UiAutomator2
     ...    autoGrantPermissions=true
-    
+
     Open Application    ${REMOTE_URL}    &{options}
-    Set Appium Timeout    10s
+    Set Appium Timeout  10s
 
 Setup Com Login
     [Arguments]    ${usuario_login}
