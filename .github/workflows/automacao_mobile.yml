@@ -1,53 +1,78 @@
-name: Mobile Robot Framework Tests
+name: Teste Mobile com Emulador Android
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
   pull_request:
-    branches: [main]
+    branches: [ main ]
 
 jobs:
-  test:
+  run-tests:
     runs-on: ubuntu-latest
 
+    env:
+      ANDROID_SDK_ROOT: ${{ runner.temp }}/android-sdk
+      JAVA_HOME: /usr/lib/jvm/java-11-openjdk-amd64
+      PATH: ${{ runner.temp }}/android-sdk/cmdline-tools/latest/bin:${{ runner.temp }}/android-sdk/platform-tools:${{ runner.temp }}/android-sdk/emulator:$PATH
+
     steps:
-      - name: 📥 Checkout do código
+      - name: 📥 Checkout do repositório
         uses: actions/checkout@v4
 
-      - name: ☕ Setup JDK 17
-        uses: actions/setup-java@v3
+      - name: ☕ Setup Java 11
+        uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: '17'
+          distribution: 'temurin'
+          java-version: 11
 
-      - name: 📱 Setup Android SDK
-        uses: android-actions/setup-android@v2
-        with:
-          distribution: cmdline-tools
-          api-level: 30
-          target: android-30
-          arch: x86_64
-
-      - name: 🚀 Criar e iniciar emulador Android
+      - name: 📱 Instalar Android SDK e ferramentas
         run: |
-          sdkmanager "system-images;android-30;google_apis;x86_64"
-          echo "no" | avdmanager create avd -n test -k "system-images;android-30;google_apis;x86_64" --force
-          $ANDROID_HOME/emulator/emulator -avd test -no-window -no-audio -no-boot-anim &
+          mkdir -p $ANDROID_SDK_ROOT/cmdline-tools
+          curl -o commandlinetools.zip https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
+          unzip commandlinetools.zip -d $ANDROID_SDK_ROOT/cmdline-tools
+          mv $ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools $ANDROID_SDK_ROOT/cmdline-tools/latest
+          yes | sdkmanager --sdk_root=$ANDROID_SDK_ROOT --licenses
+          sdkmanager --sdk_root=$ANDROID_SDK_ROOT "platform-tools" "platforms;android-30" "system-images;android-30;google_apis;x86_64" "emulator"
+
+      - name: 🎛️ Criar e iniciar emulador Android
+        run: |
+          echo "no" | avdmanager --sdk_root=$ANDROID_SDK_ROOT create avd -n test -k "system-images;android-30;google_apis;x86_64" --force
+          $ANDROID_SDK_ROOT/emulator/emulator -avd test -no-window -gpu swiftshader_indirect -no-audio -no-boot-anim &
 
       - name: ⏳ Aguardar emulador iniciar
-        run: adb wait-for-device
+        run: |
+          timeout=600
+          elapsed=0
+          boot_completed=""
+          while [[ "$boot_completed" != "1" ]]; do
+            boot_completed=$(adb -e shell getprop sys.boot_completed 2>/dev/null | tr -d '\r\n')
+            if [[ "$boot_completed" == "1" ]]; then
+              echo "Emulador iniciado com sucesso"
+              break
+            fi
+            if [[ $elapsed -ge $timeout ]]; then
+              echo "Timeout ao aguardar emulador iniciar"
+              exit 1
+            fi
+            echo "Aguardando emulador iniciar... ${elapsed}s"
+            sleep 5
+            elapsed=$((elapsed + 5))
+          done
 
-      - name: ⚙️ Instalar dependências Python e Node.js
+      - name: 🐍 Instalar dependências Python
         run: |
           python3 -m venv venv
           . venv/bin/activate
+          pip install --upgrade pip
           pip install -r requirements.txt
-          npm install -g appium
 
-      - name: 🚩 Iniciar Appium server
-        run: appium &
-
-      - name: 🎯 Executar testes Robot Framework
+      - name: ▶️ Rodar testes Robot Framework
         run: |
           . venv/bin/activate
-          robot test_cases/
+          robot --outputdir results test_cases/
+
+      - name: 📂 Upload dos resultados
+        uses: actions/upload-artifact@v4
+        with:
+          name: results
+          path: results/
