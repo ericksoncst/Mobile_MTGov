@@ -15,10 +15,9 @@ ENV PATH="$JAVA_HOME/bin:$PATH"
 RUN mkdir -p ${ANDROID_HOME}/cmdline-tools && \
     cd ${ANDROID_HOME}/cmdline-tools && \
     wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O tools.zip && \
-    unzip tools.zip && \
-    mv cmdline-tools latest && \
-    rm tools.zip && \
-    chmod +x ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager
+    unzip tools.zip -d cmdline-tools && \
+    mv cmdline-tools ${ANDROID_HOME}/cmdline-tools/latest && \
+    rm tools.zip
 
 # Testa sdkmanager (opcional)
 RUN ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --version
