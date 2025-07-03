@@ -13,11 +13,10 @@ RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
     apt-get install -y nodejs
 
 # Instala Appium e bibliotecas Python
-RUN npm install -g appium && \
-    pip3 install robotframework \
-    robotframework-appiumlibrary \
-    Appium-Python-Client \
-    "selenium>=4.10.0"
+RUN pip install robotframework \
+    robotframework-appiumlibrary==2.1.0 \
+    Appium-Python-Client==3.1.0 \
+    selenium==4.15.2
 
 # Define diretório do projeto
 WORKDIR /tests
