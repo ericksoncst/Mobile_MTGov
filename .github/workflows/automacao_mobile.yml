@@ -37,31 +37,13 @@ jobs:
           profile: Pixel_4
           disable-animations: false  # Disabled problematic animation setting
           script: |
-            # Wait for emulator to fully boot
             adb wait-for-device
-            while [[ "$(adb shell getprop sys.boot_completed | tr -d '\r')" != "1" ]]; do
-              sleep 5
-              echo "Waiting for emulator to boot..."
-            done
-
-            # Install APK
-            adb install -t apps/app.apk
-            sleep 10
-
-            # Start Appium
+            sleep 30  # Simple fixed wait instead of loop
+            adb install apps/app.apk
             npm install -g appium
-            appium driver install uiautomator2
-            appium --relaxed-security --base-path /wd/hub > appium.log 2>&1 &
-            sleep 15
-
-            # Run tests
-            robot --variable REMOTE_URL:http://localhost:4723/wd/hub \
-                  --variable PLATFORM_NAME:Android \
-                  --variable DEVICE_NAME:emulator-5554 \
-                  --variable APP_PACKAGE:br.gov.mt.cepromat.mtcidadao \
-                  --variable APP_ACTIVITY:br.gov.mt.cepromat.mtcidadao.MainActivity \
-                  --outputdir results \
-                  test_cases/
+            appium --relaxed-security --base-path /wd/hub &
+            sleep 20
+            robot --outputdir results test_cases/
 
       - name: 📤 Upload test results
         uses: actions/upload-artifact@v4
