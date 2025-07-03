@@ -19,8 +19,9 @@ RUN mkdir -p ${ANDROID_HOME}/cmdline-tools && \
 
 # Instalando SDKs necessários
 # Usar imagem ARM em vez de x86_64
-RUN yes | $ANDROID_HOME/cmdline-tools/tools/bin/sdkmanager --licenses && \
-    $ANDROID_HOME/cmdline-tools/tools/bin/sdkmanager \
+
+RUN yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses && \
+    $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
         "platform-tools" \
         "platforms;android-30" \
         "system-images;android-30;google_apis;armeabi-v7a" \
