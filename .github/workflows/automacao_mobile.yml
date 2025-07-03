@@ -48,22 +48,27 @@ jobs:
         run: |
           yes | sdkmanager --licenses
           sdkmanager "platform-tools" "emulator" "platforms;android-30"
-          sdkmanager "system-images;android-30;google_apis;x86"
+          sdkmanager "system-images;android-30;default;x86"
           echo "$ANDROID_HOME/emulator" >> $GITHUB_PATH
           echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
 
       - name: Create and verify AVD
         run: |
           echo no | avdmanager create avd \
-            -n Pixel_7_Pro_API_30 \
-            -k "system-images;android-30;google_apis;x86" \
-            --device "pixel_7_pro" \
-            --path $ANDROID_AVD_HOME/Pixel_7_Pro_API_30.avd
+            -n TestAVD \
+            -k "system-images;android-30;default;x86" \
+            --device "Nexus 5" \
+            --path $ANDROID_AVD_HOME/TestAVD.avd
+          
+          # Modify config.ini to disable problematic features
+          echo "hw.cpu.ncore=2" >> $ANDROID_AVD_HOME/TestAVD.avd/config.ini
+          echo "hw.cpu.arch=x86" >> $ANDROID_AVD_HOME/TestAVD.avd/config.ini
+          echo "hw.cpu.model=athlon" >> $ANDROID_AVD_HOME/TestAVD.avd/config.ini
+          echo "vm.heapSize=256" >> $ANDROID_AVD_HOME/TestAVD.avd/config.ini
           
           # Verify AVD creation
           emulator -list-avds
-          ls -la $ANDROID_AVD_HOME/
-          cat $ANDROID_AVD_HOME/Pixel_7_Pro_API_30.avd/config.ini
+          cat $ANDROID_AVD_HOME/TestAVD.avd/config.ini
 
       - name: Set up Node.js
         uses: actions/setup-node@v3
@@ -78,30 +83,43 @@ jobs:
       - name: Start Appium server
         run: |
           nohup appium -p 4725 -pa /wd/hub --log-timestamp --local-timezone > ${{ env.ROOT }}/appium.log 2>&1 &
-          sleep 5
+          sleep 10
           cat ${{ env.ROOT }}/appium.log
 
       - name: Run tests
         run: |
-          # Start emulator with software rendering
+          # Start emulator with maximum compatibility settings
           $ANDROID_HOME/emulator/emulator \
-            -avd Pixel_7_Pro_API_30 \
+            -avd TestAVD \
             -no-audio \
             -no-window \
             -no-snapshot \
             -no-boot-anim \
-            -writable-system \
-            -gpu swiftshader_indirect \
-            -no-accel &
+            -no-accel \
+            -gpu off \
+            -memory 2048 \
+            -partition-size 1024 \
+            -feature -GLESDynamicVersion \
+            -skip-adb-auth \
+            -no-snapstorage \
+            -no-jni \
+            -qemu -m 2048 -enable-kvm &
           
-          adb wait-for-device
-          adb shell 'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 1; done; input keyevent 82'
+          # Wait for emulator with timeout
+          timeout 300 bash -c 'until adb shell getprop sys.boot_completed 2>/dev/null | grep -q 1; do sleep 5; echo "Waiting for emulator..."; done'
+          
+          # Unlock device
+          adb shell input keyevent 82
           
           # Install APK
           adb install -t -g ${{ env.ROOT }}/apps/app.apk
           
-          # Run tests
-          robot -d ${{ env.ROOT }}/reports -v APPIUM_PORT:4725 -v APK_PATH:${{ env.ROOT }}/apps/app.apk ${{ env.ROOT }}/test_cases/
+          # Run tests with increased timeout
+          robot --exitonfailure --exitonerror --timestampoutputs \
+            -d ${{ env.ROOT }}/reports \
+            -v APPIUM_PORT:4725 \
+            -v APK_PATH:${{ env.ROOT }}/apps/app.apk \
+            ${{ env.ROOT }}/test_cases/
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
