@@ -2,7 +2,7 @@ FROM registry-gitlab.mti.mt.gov.br/docker-images/ubuntu
 
 # Instalando dependências
 RUN apt-get update && \
-    apt-get install -y nodejs npm python3-pip openjdk-17-jdk wget unzip && \
+    apt-get install -y nodejs npm python3-pip python3-venv android-tools-adb openjdk-17-jdk wget unzip && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
