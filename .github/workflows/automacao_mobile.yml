@@ -25,20 +25,12 @@ jobs:
           pip install robotframework robotframework-appiumlibrary
 
       - name: 🔧 Set up Android Emulator
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: ReactiveCircus/android-emulator-runner@v2
         with:
           api-level: 30
+          target: google_apis
           arch: x86_64
-          profile: Nexus 6
-          disable-animations: true
-          script: echo "Emulator is starting"
-
-      - name: ⏳ Wait for emulator
-        run: |
-          echo "Waiting for device to be ready..."
-          adb wait-for-device
-          sleep 30  # Fixed wait time instead of loop
-          echo "Proceeding with tests"
+          script: ./gradlew connectedCheck
 
       - name: 📱 Install APK
         run: |
