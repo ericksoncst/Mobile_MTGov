@@ -1,21 +1,47 @@
-name: Testes Mobile Locais com Appium
+name: Mobile Automation Tests
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+    branches:
+      - main
 
 jobs:
-  android-tests:
+  run-tests:
     runs-on: ubuntu-latest
 
+    services:
+      appium:
+        image: appium/appium
+        ports:
+          - 4723:4723
+        options: >-
+          --health-cmd "curl --fail http://localhost:4723/wd/hub/status || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
-      - name: 📥 Checkout do repositório
-        uses: actions/checkout@v4
+    - uses: actions/checkout@v3
 
-      - name: 🐳 Build da imagem Docker
-        run: docker build -t mobile-tests .
+    - name: Wait for Appium to be ready
+      run: |
+        for i in {1..30}; do
+          curl --fail http://localhost:4723/wd/hub/status && break
+          echo "Waiting for Appium..."
+          sleep 5
+        done
 
-      - name: ▶️ Executar os testes no container
-        run: docker run --rm mobile-tests
+    - name: Setup Python & dependencies
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.8'
+
+    - name: Install dependencies
+      run: |
+        pip install robotframework appium-python-client robotframework-appiumlibrary
+
+    - name: Run Robot Framework Tests
+      run: |
+        robot tests/
+      env:
+        APPIUM_SERVER: http://localhost:4723/wd/hub
