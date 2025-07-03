@@ -27,10 +27,10 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Install Node.js 18.x (current LTS) using nodesource setup script
+# Install Node.js 20.x (current LTS)
 RUN mkdir -p /etc/apt/keyrings && \
     curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg && \
-    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_18.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list && \
+    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list && \
     apt-get update && \
     apt-get install -y nodejs && \
     npm install -g npm@latest
@@ -66,8 +66,8 @@ RUN echo "no" | ${ANDROID_HOME}/cmdline-tools/latest/bin/avdmanager \
     create avd -n testEmulator -k "system-images;android-30;google_apis;x86_64" \
     --device "pixel_4" --force
 
-# Install Appium with specific stable version and its dependencies
-RUN npm install -g appium@2.9.0 && \
+# Install Appium with version compatible with Node.js 20
+RUN npm install -g appium@2.13.0 && \
     npm install -g appium-doctor && \
     appium driver install uiautomator2 && \
     appium driver install xcuitest
