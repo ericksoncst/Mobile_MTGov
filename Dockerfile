@@ -7,9 +7,14 @@ RUN apt-get update && \
     wget \
     unzip \
     openjdk-17-jdk \
+    qemu-kvm \
+    libvirt-daemon-system \
+    libvirt-clients \
+    bridge-utils \
+    virtinst \
     && rm -rf /var/lib/apt/lists/*
 
-# 2. Install Android Command Line Tools PROPERLY
+# 2. Install Android Command Line Tools
 RUN mkdir -p /opt/android-sdk/cmdline-tools && \
     cd /opt/android-sdk/cmdline-tools && \
     wget -q https://dl.google.com/android/repository/commandlinetools-linux-10406996_latest.zip && \
@@ -17,24 +22,45 @@ RUN mkdir -p /opt/android-sdk/cmdline-tools && \
     mv cmdline-tools latest && \
     rm commandlinetools-linux-10406996_latest.zip
 
-# 3. Set PATH correctly (critical fix)
+# 3. Set environment variables
 ENV ANDROID_HOME=/opt/android-sdk
-ENV PATH="${PATH}:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools"
+ENV PATH="${PATH}:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${ANDROID_HOME}/emulator"
 
-# 4. Accept licenses and install packages (with proper PATH)
+# 4. Accept licenses and install packages
 RUN yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --licenses && \
-    ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager "platform-tools" "emulator" "platforms;android-30"
+    ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager \
+    "platform-tools" \
+    "emulator" \
+    "platforms;android-30" \
+    "system-images;android-30;google_apis;x86_64"
 
-# 5. Install Python dependencies
+# 5. Create Android Virtual Device
+RUN echo "no" | ${ANDROID_HOME}/cmdline-tools/latest/bin/avdmanager create avd \
+    --name test \
+    --package "system-images;android-30;google_apis;x86_64" \
+    --device "pixel_4" \
+    --force
+
+# 6. Install Python dependencies
 RUN python3 -m pip install --upgrade pip && \
     pip install robotframework robotframework-appiumlibrary
 
-# 6. Use pre-built Appium server (no npm needed)
-RUN wget https://github.com/appium/appium-inspector/releases/download/v2023.12.1/Appium-Inspector-linux-2023.12.1.AppImage -O /usr/local/bin/appium && \
-    chmod +x /usr/local/bin/appium
+# 7. Install Appium via npm (properly)
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs npm && \
+    npm install -g appium && \
+    appium driver install uiautomator2 && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY . .
 
-# 7. Simple entrypoint
-CMD ["sh", "-c", "appium & adb devices && robot --outputdir results test_cases/"]
+# 8. Health check and entrypoint
+HEALTHCHECK --interval=30s --timeout=30s --start-period=30s --retries=3 \
+    CMD adb devices | grep emulator || exit 1
+
+CMD ["sh", "-c", "emulator -avd test -no-audio -no-window -gpu swiftshader_indirect & \
+     adb wait-for-device && \
+     appium --relaxed-security --base-path /wd/hub & \
+     while ! adb shell getprop sys.boot_completed | grep -q 1; do sleep 5; done && \
+     robot --outputdir results test_cases/"]
