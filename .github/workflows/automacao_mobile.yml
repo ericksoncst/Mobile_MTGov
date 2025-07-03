@@ -34,16 +34,34 @@ jobs:
           api-level: 30
           target: google_apis
           arch: x86_64
-          profile: Pixel_4
-          disable-animations: false  # Disabled problematic animation setting
+          # Removed problematic profile specification
           script: |
+            # Wait for emulator to fully boot
+            echo "Waiting for emulator..."
             adb wait-for-device
-            sleep 30  # Simple fixed wait instead of loop
-            adb install apps/app.apk
+            sleep 30  # Fixed wait time instead of complex checks
+            
+            # Install APK
+            echo "Installing APK..."
+            adb install -t apps/app.apk
+            sleep 10
+
+            # Start Appium
+            echo "Starting Appium..."
             npm install -g appium
-            appium --relaxed-security --base-path /wd/hub &
-            sleep 20
-            robot --outputdir results test_cases/
+            appium driver install uiautomator2
+            appium --relaxed-security --base-path /wd/hub > appium.log 2>&1 &
+            sleep 15
+
+            # Run tests
+            echo "Starting tests..."
+            robot --variable REMOTE_URL:http://localhost:4723/wd/hub \
+                  --variable PLATFORM_NAME:Android \
+                  --variable DEVICE_NAME:emulator-5554 \
+                  --variable APP_PACKAGE:br.gov.mt.cepromat.mtcidadao \
+                  --variable APP_ACTIVITY:br.gov.mt.cepromat.mtcidadao.MainActivity \
+                  --outputdir results \
+                  test_cases/
 
       - name: 📤 Upload test results
         uses: actions/upload-artifact@v4
