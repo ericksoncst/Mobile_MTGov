@@ -26,11 +26,12 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: '17'
-          
+
       - name: 📱 Iniciar Emulador Android
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 30
+          target: google_apis
           arch: x86
           profile: Nexus 6
           disable-animations: true
