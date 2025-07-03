@@ -17,7 +17,7 @@ jobs:
   robot-test:
     timeout-minutes: 25
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v4
 
@@ -74,22 +74,27 @@ jobs:
 
       - name: Start emulator and run tests
         run: |
-          # Start emulator in background
+          echo "Starting emulator..."
           nohup emulator -avd ${{ env.EMULATOR_NAME }} \
-            -no-snapshot -no-window -gpu swiftshader_indirect -no-audio -no-boot-anim > emulator.log 2>&1 &
+            -no-snapshot -no-window -gpu off -no-audio -no-boot-anim > emulator.log 2>&1 &
 
-          # Wait for emulator to be ready
+          echo "Waiting for emulator to boot..."
           adb wait-for-device
-          timeout ${{ env.EMULATOR_TIMEOUT }} bash -c \
-            'until adb shell getprop sys.boot_completed | grep -m 1 "1"; do echo "Waiting for emulator..."; sleep 5; done'
 
-          # Unlock emulator screen
+          timeout ${{ env.EMULATOR_TIMEOUT }} bash -c '
+            until adb shell getprop sys.boot_completed | grep -m 1 "1"; do
+              echo "Waiting for emulator boot...";
+              sleep 5;
+              tail -n 10 emulator.log || true
+            done'
+
+          echo "Unlocking emulator..."
           adb shell input keyevent 82
 
-          # Install your APK
-          adb install -t -g apps/app.apk
+          echo "Installing app..."
+          adb install -t -g apps/app.apk || (echo "APK install failed"; tail -n 50 emulator.log; exit 1)
 
-          # Run Robot Framework tests
+          echo "Running Robot Framework tests..."
           robot -d reports \
             -v APPIUM_PORT:${{ env.APPIUM_PORT }} \
             -v PLATFORM_VERSION:${{ env.API_LEVEL }} \
