@@ -29,13 +29,18 @@
     # COPY ./tests /home/appuser/tests
     COPY ./apps/app.apk /apps/app.apk
     
-    # Start Appium Server in the background
-    CMD echo "🚀 Iniciando Appium Server" && \
-        appium --log-level error &
+    # # Start Appium Server in the background
+    # CMD echo "🚀 Iniciando Appium Server" && \
+    #     appium --log-level error &
     
-    # Execute tests with Robot Framework
-    CMD echo "🎯 Executando testes com Robot Framework" && \
-        robot --outputdir /tests/results /tests
+    # # Execute tests with Robot Framework
+    # CMD echo "🎯 Executando testes com Robot Framework" && \
+    #     robot --outputdir /tests/results /tests
+
+    CMD appium > appium.log 2>&1 & \
+    echo "⏳ Aguardando Appium iniciar..." && \
+    sleep 10 && \
+    robot --outputdir results test_cases
     
     # Define artifacts directory (handled by CI/CD system, not Docker)
     # artifacts:
