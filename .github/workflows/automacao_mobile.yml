@@ -1,36 +1,27 @@
-name: Android Emulator Test
+name: Continuous Integration
 
 on:
-  workflow_dispatch:
   push:
-
-env:
-  ANDROID_ARCH: x86_64
-  ANDROID_TARGET: google_apis
-  API_LEVEL: 30
-  ANDROID_BUILD_TOOLS_VERSION: 30.0.3
-  EMULATOR_NAME: nexus
-  EMULATOR_TIMEOUT: 350
-  APPIUM_PORT: 4725
+  workflow_dispatch:
 
 jobs:
-  robot-test:
-    timeout-minutes: 25
+  execute_test:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Use Python 3.9
         uses: actions/setup-python@v5
         with:
-          python-version: '3.9'
+          python-version: 3.9
+          cache: 'pip'
 
-      - name: Install Robot Framework and dependencies
+      - name: Install Python dependencies
         run: |
+          pip install -r requirements.txt
           pip install robotframework
           pip install robotframework-appiumlibrary
-          pip install -r requirements.txt
 
       - name: Set up Java
         uses: actions/setup-java@v3
@@ -38,75 +29,43 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 'lts/*'
 
-      - name: Install Appium
+      - name: Install Appium & UiAutomator2
         run: |
           npm install -g appium
           appium driver install uiautomator2
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android SDK components
+      - name: Start Appium Server
         run: |
-          yes | sdkmanager --licenses
-          sdkmanager "platform-tools" "emulator" "platforms;android-${{ env.API_LEVEL }}" \
-            "system-images;android-${{ env.API_LEVEL }};${{ env.ANDROID_TARGET }};${{ env.ANDROID_ARCH }}" \
-            "build-tools;${{ env.ANDROID_BUILD_TOOLS_VERSION }}"
+          nohup appium -p 4725 -pa /wd/hub --log-timestamp --local-timezone > appium.log 2>&1 &
 
-      - name: Create AVD
-        run: |
-          echo "no" | avdmanager create avd \
-            --force \
-            --name ${{ env.EMULATOR_NAME }} \
-            --package "system-images;android-${{ env.API_LEVEL }};${{ env.ANDROID_TARGET }};${{ env.ANDROID_ARCH }}" \
-            --abi "${{ env.ANDROID_ARCH }}"
+      - name: Run Android Emulator + Install APK + Run Tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6_pro
+          disable-animations: true
+          script: |
+            echo "Installing APK..."
+            adb install -t -g apps/app.apk
 
-      - name: Start Appium server
-        run: |
-          nohup appium -p ${{ env.APPIUM_PORT }} -pa /wd/hub --log-timestamp --local-timezone > appium.log 2>&1 &
-          sleep 10
-          cat appium.log
-
-      - name: Start emulator and run tests
-        run: |
-          echo "Starting emulator..."
-          nohup emulator -avd ${{ env.EMULATOR_NAME }} \
-            -no-snapshot -no-window -gpu off -no-audio -no-boot-anim > emulator.log 2>&1 &
-
-          echo "Waiting for emulator to boot..."
-          adb wait-for-device
-
-          timeout ${{ env.EMULATOR_TIMEOUT }} bash -c '
-            until adb shell getprop sys.boot_completed | grep -m 1 "1"; do
-              echo "Waiting for emulator boot...";
-              sleep 5;
-              tail -n 10 emulator.log || true
-            done'
-
-          echo "Unlocking emulator..."
-          adb shell input keyevent 82
-
-          echo "Installing app..."
-          adb install -t -g apps/app.apk || (echo "APK install failed"; tail -n 50 emulator.log; exit 1)
-
-          echo "Running Robot Framework tests..."
-          robot -d reports \
-            -v APPIUM_PORT:${{ env.APPIUM_PORT }} \
-            -v PLATFORM_VERSION:${{ env.API_LEVEL }} \
-            -v DEVICE_NAME:${{ env.EMULATOR_NAME }} \
-            test_cases/
+            echo "Running Robot Framework tests..."
+            robot -d ./reports -v APPIUM_PORT:4725 test_cases/
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-reports
+          name: reports
           path: |
             reports/
             appium.log
-            emulator.log
