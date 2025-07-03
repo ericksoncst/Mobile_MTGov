@@ -9,17 +9,15 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 25
 
     steps:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
 
-      - name: 🐳 Build Docker image
-        run: docker build -t mobile-tests .
-
-      - name: 🚀 Run tests
+      - name: 🐳 Build and run tests
         run: |
+          docker build -t mobile-tests . && \
           docker run --rm \
             --device /dev/kvm \
             -v $(pwd)/results:/app/results \
