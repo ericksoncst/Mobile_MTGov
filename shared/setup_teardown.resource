@@ -21,8 +21,6 @@ Open Test Application
     ...    appPackage=${APP_PACKAGE}
     ...    appActivity=${APP_ACTIVITY}
     ...    autoGrantPermissions=true
-    ...    bstack:options.enableCameraImageInjection=true
-    ...    bstack:options.idleTimeout=300
     ...    bstack:options.userName=%{BROWSERSTACK_USERNAME}
     ...    bstack:options.accessKey=%{BROWSERSTACK_ACCESS_KEY}
 
