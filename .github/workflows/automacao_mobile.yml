@@ -37,7 +37,7 @@ jobs:
 
       - name: 🎛️ Criar e iniciar emulador Android
         run: |
-          echo "no" | avdmanager --sdk_root=$ANDROID_SDK_ROOT create avd -n test -k "system-images;android-30;google_apis;x86_64" --force
+          echo "no" | avdmanager create avd -n test -k "system-images;android-30;google_apis;x86_64" --device "pixel" --force
           $ANDROID_SDK_ROOT/emulator/emulator -avd test -no-window -gpu swiftshader_indirect -no-audio -no-boot-anim &
 
       - name: ⏳ Aguardar emulador iniciar
