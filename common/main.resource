@@ -23,6 +23,8 @@ Resource  ../resources/seguranca_publica.resource
 
 
 *** Variables ***
+${REMOTE_URL}    http://localhost:4723/wd/hub
 ${PLATFORM_NAME}    Android
-${BROWSERSTACK_USERNAME}  nereucostanoguei1
-${BROWSERSTACK_ACCESS_KEY}  qyNiqcXezmuw8A53MkM1
+${DEVICE_NAME}    emulator-5554
+${PROJECT_ROOT}    ${CURDIR}/..
+${APP}             ${PROJECT_ROOT}/apps/app.apk
