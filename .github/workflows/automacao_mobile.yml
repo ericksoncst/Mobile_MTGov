@@ -1,9 +1,8 @@
-name: Automação Mobile
+name: 🧪 Testes Mobile com Android Emulator + Appium
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
 
 jobs:
@@ -27,50 +26,50 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: 📱 Iniciar Emulador Android
+      - name: 🤖 Iniciar Emulador Android
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 30
-          target: google_apis
           arch: x86
+          target: google_apis
           profile: Nexus 6
           disable-animations: true
-          emulator-options: "-no-snapshot-save -no-boot-anim -no-window -no-metrics"
+          emulator-options: -no-window -gpu swiftshader_indirect -no-audio -no-boot-anim -no-metrics
           script: echo "✅ Emulador iniciado"
 
-
-      - name: 🐍 Instalar dependências Python
-        run: |
-          python -m pip install --upgrade pip
-          pip install robotframework robotframework-appiumlibrary Appium-Python-Client==2.7.1
-
-      - name: 🕐 Aguardar emulador estar pronto
+      - name: ⏳ Aguardar emulador iniciar completamente
         run: |
           adb wait-for-device
-          timeout=300
-          elapsed=0
           boot_completed=""
-          while [[ "$boot_completed" != "1" && $elapsed -lt $timeout ]]; do
+          timeout=300
+          while [[ "$boot_completed" != "1" && $timeout -gt 0 ]]; do
             boot_completed=$(adb shell getprop sys.boot_completed | tr -d '\r')
-            echo "⏳ Aguardando boot completo... ($elapsed s)"
+            echo "⏳ Aguardando boot... ($timeout segundos restantes)"
             sleep 5
-            elapsed=$((elapsed + 5))
+            ((timeout-=5))
           done
 
           if [[ "$boot_completed" != "1" ]]; then
-            echo "❌ Timeout esperando boot do emulador"
+            echo "❌ Emulador não inicializou"
             adb devices
             exit 1
           fi
 
-          adb shell input keyevent 82 # desbloqueia tela
+          adb devices
+          adb shell input keyevent 82
 
-      - name: 📦 Instalar APK no emulador
+      - name: 📦 Instalar dependências Python
         run: |
-          adb install -r apps/app.apk
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install robotframework robotframework-appiumlibrary Appium-Python-Client==2.7.1
+
+      - name: 📱 Instalar APK no emulador
+        run: |
+          adb install -r apps/app.apk || true
           sleep 10
 
-      - name: 🤖 Rodar testes com Robot Framework
+      - name: ▶️ Rodar testes com Robot Framework
         env:
           APPIUM_URL: http://localhost:4723/wd/hub
           PLATFORM_NAME: Android
@@ -80,6 +79,7 @@ jobs:
           APP_ACTIVITY: br.gov.mt.cepromat.mtcidadao.MainActivity
         run: |
           robot \
+            --outputdir results \
             --variable APPIUM_URL:$APPIUM_URL \
             --variable PLATFORM_NAME:$PLATFORM_NAME \
             --variable DEVICE_NAME:$DEVICE_NAME \
@@ -88,12 +88,9 @@ jobs:
             --variable APP_ACTIVITY:$APP_ACTIVITY \
             test_cases/
 
-      - name: 📤 Upload dos resultados
+      - name: 📂 Upload dos resultados
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: test-results
-          path: |
-            output.xml
-            report.html
-            log.html
+          path: results/
