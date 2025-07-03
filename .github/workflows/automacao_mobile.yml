@@ -9,7 +9,13 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
+
+    services:
+      appium:
+        image: appium/appium
+        ports:
+          - 4723:4723
 
     steps:
       - name: 📥 Checkout repository
@@ -20,10 +26,22 @@ jobs:
 
       - name: 🚀 Run tests
         run: |
+          # Start emulator in background
+          docker run -d \
+            --device /dev/kvm \
+            --name emulator \
+            mobile-tests emulator -avd test -no-audio -no-window -gpu swiftshader_indirect
+
+          # Wait for emulator to start
+          docker exec emulator adb wait-for-device
+          sleep 30
+
+          # Run tests
           docker run --rm \
+            --network host \
             -v $(pwd)/results:/app/results \
             -v $(pwd)/apps:/app/apps \
-            mobile-tests
+            mobile-tests robot --outputdir results test_cases/
 
       - name: 📤 Upload test results
         uses: actions/upload-artifact@v4

@@ -5,7 +5,6 @@ RUN apt-get update && \
     apt-get install -y \
     python3-pip \
     python3-venv \
-    openjdk-11-jdk \
     wget \
     unzip \
     adb \
@@ -21,8 +20,14 @@ RUN apt-get update && \
     npm \
     && rm -rf /var/lib/apt/lists/*
 
+# Install Java 17 (required for Android SDK)
+RUN apt-get update && \
+    apt-get install -y openjdk-17-jdk && \
+    update-alternatives --set java /usr/lib/jvm/java-17-openjdk-amd64/bin/java && \
+    rm -rf /var/lib/apt/lists/*
+
 # Set up Android SDK
-ENV ANDROID_HOME /opt/android-sdk
+ENV ANDROID_HOME=/opt/android-sdk
 RUN mkdir -p ${ANDROID_HOME}/cmdline-tools && \
     cd ${ANDROID_HOME}/cmdline-tools && \
     wget -q https://dl.google.com/android/repository/commandlinetools-linux-10406996_latest.zip && \
