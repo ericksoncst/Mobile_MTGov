@@ -6,8 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Install dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        nodejs \
-        npm \
+        curl \
         python3-pip \
         python3-venv \
         android-tools-adb \
@@ -25,6 +24,11 @@ RUN apt-get update && \
         && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
+
+# Install Node.js 16.x (LTS) which is more stable for Appium
+RUN curl -fsSL https://deb.nodesource.com/setup_16.x | bash - && \
+    apt-get install -y nodejs && \
+    npm install -g npm@latest
 
 # Configure environment variables
 ENV ANDROID_HOME=/opt/android-sdk
@@ -57,8 +61,11 @@ RUN echo "no" | ${ANDROID_HOME}/cmdline-tools/latest/bin/avdmanager \
     create avd -n testEmulator -k "system-images;android-30;google_apis;x86_64" \
     --device "pixel_4" --force
 
-# Install Appium
-RUN npm install -g appium
+# Install Appium with specific stable version and its dependencies
+RUN npm install -g appium@2.0.0 && \
+    npm install -g appium-doctor && \
+    appium driver install uiautomator2 && \
+    appium driver install xcuitest
 
 # Set working directory
 WORKDIR /app
