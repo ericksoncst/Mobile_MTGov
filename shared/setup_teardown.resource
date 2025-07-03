@@ -5,7 +5,7 @@ Resource  ../common/main.resource
 ** Variables ***
 ${PLATFORM_NAME}    Android
 ${DEVICE_NAME}      emulator-5554
-${APP_PATH}    C:/Users/gustavo.moraes/Desktop/temp_kiko/Mobile_MTGov/apps/app.apk
+${APP_PATH}         C:/MT_APP/app-test/app-tester/apps/app.apk
 ${APP_PACKAGE}      br.gov.mt.cepromat.mtcidadao
 ${APP_ACTIVITY}     br.gov.mt.cepromat.mtcidadao.MainActivity
 ${APP_PACKAGE}      br.gov.mt.cepromat.mtcidadao
@@ -13,7 +13,7 @@ ${APP_ACTIVITY}     br.gov.mt.cepromat.mtcidadao.MainActivity
 
 *** Keywords ***
 abrir app
-    Open Application    http://127.0.0.1:4723/wd/hub
+    Open Application    http://localhost:4723/wd/hub
     ...    deviceName=${DEVICE_NAME}
     ...    platformName=${PLATFORM_NAME}
     ...    app=${APP_PATH}
