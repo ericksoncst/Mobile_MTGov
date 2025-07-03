@@ -1,4 +1,4 @@
-name: Testes Mobile Locais com Appium
+name: Mobile Tests with Appium
 
 on:
   push:
@@ -9,13 +9,46 @@ on:
 jobs:
   android-tests:
     runs-on: ubuntu-latest
+    container:
+      image: docker:dind
+      options: --privileged
+
+    services:
+      appium:
+        image: appium/appium
+        ports:
+          - 4723:4723
 
     steps:
-      - name: 📥 Checkout do repositório
+      - name: 📥 Checkout repository
         uses: actions/checkout@v4
 
-      - name: 🐳 Build da imagem Docker
-        run: docker build -t mobile-tests .
+      - name: 🔍 Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
 
-      - name: ▶️ Executar os testes no container
-        run: docker run --rm mobile-tests
+      - name: 📦 Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install robotframework robotframework-appiumlibrary
+
+      - name: 🔌 Start ADB server
+        run: |
+          sudo apt-get update && sudo apt-get install -y android-tools-adb
+          adb start-server
+
+      - name: 🧪 Run tests
+        run: |
+          echo "🎯 Running tests with Robot Framework"
+          robot --outputdir results/ tests/
+
+      - name: 📤 Upload test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: test-results
+          path: |
+            results/output.xml
+            results/report.html
+            results/log.html
