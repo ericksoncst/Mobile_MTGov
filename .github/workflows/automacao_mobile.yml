@@ -31,7 +31,6 @@ jobs:
           pip install robotframework robotframework-appiumlibrary Appium-Python-Client==2.7.1 selenium==4.16
 
       - name: Run Robot Framework tests
-        env:
-          APPIUM_REMOTE_URL: http://127.0 0.1:4723/wd/hub
         run: |
-          robot -v REMOTE_URL:http://appium:4723/wd/hub tests/
+          . venv/bin/activate
+          robot test_cases/
