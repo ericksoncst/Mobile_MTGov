@@ -5,7 +5,7 @@ on:
   push:
 
 env:
-  ANDROID_ARCH: arm64-v8a
+  ANDROID_ARCH: x86_64
   ANDROID_TARGET: google_apis
   API_LEVEL: 30
   ANDROID_BUILD_TOOLS_VERSION: 30.0.3
@@ -15,8 +15,8 @@ env:
 
 jobs:
   robot-test:
-    timeout-minutes: 20
-    runs-on: macos-latest
+    timeout-minutes: 25
+    runs-on: ubuntu-latest
     
     steps:
       - uses: actions/checkout@v4
@@ -48,19 +48,15 @@ jobs:
           npm install -g appium
           appium driver install uiautomator2
 
-      - name: Configure Android environment
-        run: |
-          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
-          echo "$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/emulator:$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools/${{ env.ANDROID_BUILD_TOOLS_VERSION }}" >> $GITHUB_PATH
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
 
-      - name: Install Android SDK packages
+      - name: Install Android SDK components
         run: |
           yes | sdkmanager --licenses
-          sdkmanager --install "system-images;android-${{ env.API_LEVEL }};${{ env.ANDROID_TARGET }};${{ env.ANDROID_ARCH }}"
-          sdkmanager --install "platforms;android-${{ env.API_LEVEL }}"
-          sdkmanager --install "build-tools;${{ env.ANDROID_BUILD_TOOLS_VERSION }}"
-          sdkmanager --install "platform-tools"
-          sdkmanager --install "emulator"
+          sdkmanager "platform-tools" "emulator" "platforms;android-${{ env.API_LEVEL }}" \
+            "system-images;android-${{ env.API_LEVEL }};${{ env.ANDROID_TARGET }};${{ env.ANDROID_ARCH }}" \
+            "build-tools;${{ env.ANDROID_BUILD_TOOLS_VERSION }}"
 
       - name: Create AVD
         run: |
@@ -76,20 +72,24 @@ jobs:
           sleep 10
           cat appium.log
 
-      - name: Launch emulator and run tests
+      - name: Start emulator and run tests
         run: |
-          emulator -avd ${{ env.EMULATOR_NAME }} \
-            -no-audio \
-            -no-window \
-            -no-snapshot \
-            -gpu swiftshader_indirect \
-            -no-boot-anim &
+          # Start emulator in background
+          nohup emulator -avd ${{ env.EMULATOR_NAME }} \
+            -no-snapshot -no-window -gpu swiftshader_indirect -no-audio -no-boot-anim > emulator.log 2>&1 &
 
+          # Wait for emulator to be ready
           adb wait-for-device
-          timeout ${{ env.EMULATOR_TIMEOUT }} bash -c 'until adb shell getprop sys.boot_completed 2>/dev/null | grep -q 1; do sleep 5; echo "Waiting for emulator..."; done'
+          timeout ${{ env.EMULATOR_TIMEOUT }} bash -c \
+            'until adb shell getprop sys.boot_completed | grep -m 1 "1"; do echo "Waiting for emulator..."; sleep 5; done'
+
+          # Unlock emulator screen
           adb shell input keyevent 82
+
+          # Install your APK
           adb install -t -g apps/app.apk
 
+          # Run Robot Framework tests
           robot -d reports \
             -v APPIUM_PORT:${{ env.APPIUM_PORT }} \
             -v PLATFORM_VERSION:${{ env.API_LEVEL }} \
@@ -104,3 +104,4 @@ jobs:
           path: |
             reports/
             appium.log
+            emulator.log
