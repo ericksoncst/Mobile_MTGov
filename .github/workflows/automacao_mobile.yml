@@ -26,6 +26,7 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: 'lts/*'
+
       - name: Install Appium & drivers
         run: |
           npm install -g appium
@@ -51,22 +52,22 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_4
-        script: |
-          adb wait-for-device
-          until adb shell getprop sys.boot_completed | grep -m 1 "1"; do
-            echo "Waiting for emulator boot..."
-            sleep 5
-          done
+          script: |
+            adb wait-for-device
+            until adb shell getprop sys.boot_completed | grep -m 1 "1"; do
+              echo "Waiting for emulator boot..."
+              sleep 5
+            done
 
-          echo "Emulator booted, unlocking device..."
-          adb shell input keyevent 82 || true
+            echo "Unlocking emulator screen..."
+            adb shell input keyevent 82 || true
 
-          echo "Running Robot Framework tests..."
-          robot -d reports \
-            -v APPIUM_PORT:4723 \
-            -v PLATFORM_VERSION:11.0 \
-            -v DEVICE_NAME:Pixel_4_API_30 \
-            test_cases/
+            echo "Running Robot Framework tests..."
+            robot -d reports \
+              -v APPIUM_PORT:4723 \
+              -v PLATFORM_VERSION:11.0 \
+              -v DEVICE_NAME:Pixel_4_API_30 \
+              test_cases/
 
       - name: Upload Robot Framework reports
         uses: actions/upload-artifact@v4
