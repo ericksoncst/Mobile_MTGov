@@ -1,8 +1,31 @@
+name: Run Mobile Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      appium:
+        image: appium/appium:latest
+        ports:
+          - 4723:4723
+        options: >-
+          --health-cmd="curl --fail http://localhost:4723/wd/hub/status || exit 1"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set up Python 3.8
+      - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: 3.8
@@ -13,7 +36,5 @@
           pip install robotframework robotframework-appiumlibrary Appium-Python-Client==2.7.1 selenium==4.16
 
       - name: Run Robot Framework tests
-        env:
-          APPIUM_REMOTE_URL: http://appium:4723/wd/hub
         run: |
           robot -v REMOTE_URL:http://appium:4723/wd/hub tests/
