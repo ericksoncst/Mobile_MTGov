@@ -28,8 +28,9 @@ RUN yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --sdk_root="${ANDR
     ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --sdk_root="${ANDROID_HOME}" \
         "platform-tools" \
         "platforms;android-30" \
-        "system-images;android-30;google_apis;armeabi-v7a" \
-        "emulator"
+        "emulator" --channel=0 && \
+    ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --sdk_root="${ANDROID_HOME}" \
+        "system-images;android-30;google_apis_playstore;armeabi-v7a" --channel=0
 
 # Cria o AVD com imagem ARM
 RUN echo "no" | ${ANDROID_HOME}/cmdline-tools/latest/bin/avdmanager \
