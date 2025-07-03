@@ -11,21 +11,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
-    services:
-      appium:
-        image: appium/appium
-        ports:
-          - 4723:4723
-        options: >-
-          --health-cmd "curl -f http://localhost:4723/wd/hub/status || exit 1"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
-        env:
-          APPIUM_HUB_TIMEOUT: 60
-          RELAXED_SECURITY: true
-
     steps:
+
+      - name: 🚀 Run Appium
+        run: |
+          npm install -g appium
+          appium --relaxed-security --base-path /wd/hub &
+          echo "APPIUM_PID=$!" >> $GITHUB_ENV
+          sleep 10  # Give Appium time to start
+
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
 
