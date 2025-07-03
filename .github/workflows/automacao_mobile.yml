@@ -9,7 +9,7 @@ on:
 jobs:
   android-tests:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45  # Increased timeout for emulator startup
 
     steps:
       - name: 📥 Checkout repository
@@ -21,13 +21,13 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: 🔧 Install Android SDK
+      - name: 🔧 Install Android SDK and Platform Tools
         run: |
-          # Clean up any previous installation
+          # Clean previous installation
           rm -rf ~/android-sdk || true
           
-          # Create fresh directory structure
-          mkdir -p ~/android-sdk/cmdline-tools
+          # Create fresh SDK directory
+          mkdir -p ~/android-sdk
           cd ~/android-sdk
           
           # Download and extract command line tools
@@ -38,74 +38,108 @@ jobs:
           # Set environment variables
           echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
           echo "$HOME/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
-          echo "$HOME/android-sdk/platform-tools" >> $GITHUB_PATH
           
-          # Accept licenses
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
+          # Install platform-tools (includes ADB)
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools"
+          echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
+          
+          # Verify ADB installation
+          adb version
 
-      - name: 📱 Setup Android Emulator
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 30
-          arch: x86_64
-          profile: Nexus 6
-          disable-animations: true
-          script: echo "Emulator ready"
-          emulator-options: >-
-            -no-audio
-            -no-window
-            -gpu swiftshader_indirect
-            -camera-back none
-            -camera-front none
+      - name: 📱 Create and Start Emulator
+        run: |
+          # Install emulator and system image
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "emulator" "system-images;android-30;google_apis;x86_64"
+          
+          # Create AVD
+          echo "no" | $ANDROID_HOME/cmdline-tools/latest/bin/avdmanager create avd \
+            --name test \
+            --package "system-images;android-30;google_apis;x86_64" \
+            --device "pixel_4" \
+            --force
+          
+          # Start emulator in background
+          nohup $ANDROID_HOME/emulator/emulator \
+            -avd test \
+            -no-audio \
+            -no-window \
+            -gpu swiftshader_indirect \
+            -camera-back none \
+            -camera-front none > /dev/null 2>&1 &
+          
+          # Wait for emulator to fully boot
+          adb wait-for-device
+          while [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" != "1" ]; do
+            sleep 10
+            echo "⌛ Waiting for emulator to boot..."
+          done
+          
+          # Disable animations
+          adb shell settings put global window_animation_scale 0
+          adb shell settings put global transition_animation_scale 0
+          adb shell settings put global animator_duration_scale 0
+          
+          # Verify emulator is ready
+          adb devices
 
       - name: 🌐 Install Appium
         run: |
           sudo npm install -g appium
           appium driver install uiautomator2
+          appium --version
 
       - name: 🚀 Start Appium Server
         run: |
-          appium --relaxed-security --base-path /wd/hub &
+          appium --relaxed-security --base-path /wd/hub --log-timestamp --local-timezone > appium.log 2>&1 &
           echo "APPIUM_PID=$!" >> $GITHUB_ENV
           sleep 15
+          echo "Appium server started with PID $APPIUM_PID"
+          cat appium.log
 
-      - name: 🐍 Setup Python
+      - name: 🐍 Setup Python Environment
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
-      - name: 📦 Install dependencies
+      - name: 📦 Install Python Dependencies
         run: |
           pip install -r requirements.txt
           pip install robotframework robotframework-appiumlibrary
 
-      - name: 🧪 Run tests
-        timeout-minutes: 15
+      - name: 🧪 Execute Tests
+        timeout-minutes: 20
         run: |
           mkdir -p results
-          echo "Waiting for Appium to be ready..."
-          until curl -f http://localhost:4723/wd/hub/status; do
-            sleep 5
-          done
-          echo "Waiting for emulator to be ready..."
-          adb wait-for-device
-          while [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" != "1" ]; do
-            sleep 5
-          done
+          echo "🔍 Verify Appium connection..."
+          curl -f http://localhost:4723/wd/hub/status || (cat appium.log && exit 1)
+          
+          echo "🚦 Verify emulator connection..."
+          adb devices
+          adb shell getprop ro.build.version.release
+          
+          echo "🏃 Starting tests..."
           robot --variable DEVICE_NAME:emulator-5554 \
                 --variable PLATFORM_VERSION:11.0 \
                 --variable APPIUM_URL:http://localhost:4723/wd/hub \
                 --outputdir results \
-                test_cases
+                --exitonfailure \
+                test_cases || true
 
-      - name: 🛑 Stop Appium
-        if: always()
-        run: |
-          kill $APPIUM_PID || true
-
-      - name: 📤 Upload results
+      - name: 📤 Upload Test Results
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: test-results
-          path: results/
+          path: |
+            results/*
+            appium.log
+
+      - name: 🛑 Cleanup Processes
+        if: always()
+        run: |
+          echo "Stopping Appium..."
+          kill $APPIUM_PID || true
+          echo "Stopping emulator..."
+          adb emu kill || true
+          echo "List of running processes:"
+          ps aux
