@@ -2,31 +2,55 @@
 Library  AppiumLibrary
 Resource  ../common/main.resource
 
-** Variables ***
+*** Variables ***
+${REMOTE_URL}       http://hub-cloud.browserstack.com/wd/hub
 ${PLATFORM_NAME}    Android
-${DEVICE_NAME}      emulator-5554
-${APP_PATH}         C:/MT_APP/app-test/app-tester/apps/app.apk
-${APP_PACKAGE}      br.gov.mt.cepromat.mtcidadao
-${APP_ACTIVITY}     br.gov.mt.cepromat.mtcidadao.MainActivity
+${DEVICE_NAME}      Google Pixel 6
+${PLATFORM_VERSION} 12.0
+${APP}              %{APP}
 ${APP_PACKAGE}      br.gov.mt.cepromat.mtcidadao
 ${APP_ACTIVITY}     br.gov.mt.cepromat.mtcidadao.MainActivity
 
 *** Keywords ***
-abrir app
-    Open Application    http://localhost:4723/wd/hub
-    ...    deviceName=${DEVICE_NAME}
+Open Test Application
+    Open Application    ${REMOTE_URL}
     ...    platformName=${PLATFORM_NAME}
-    ...    app=${APP_PATH}
+    ...    platformVersion=${PLATFORM_VERSION}
+    ...    deviceName=${DEVICE_NAME}
+    ...    app=${APP}
     ...    appPackage=${APP_PACKAGE}
     ...    appActivity=${APP_ACTIVITY}
-    ...    uiautomator2ServerInstallTimeout=60000
-    ...    adbExecTimeout=60000
     ...    autoGrantPermissions=true
-    ...    isHeadless=true
-    ...    uiautomator2ServerInstallTimeout=60000
-    ...    automationName=UiAutomator2
+    ...    bstack:options.enableCameraImageInjection=true
+    ...    bstack:options.idleTimeout=300
+    ...    bstack:options.userName=%{BROWSERSTACK_USERNAME}
+    ...    bstack:options.accessKey=%{BROWSERSTACK_ACCESS_KEY}
 
-    Set Appium Timeout    5s
+# ** Variables ***
+# ${PLATFORM_NAME}    Android
+# ${DEVICE_NAME}      emulator-5554
+# ${APP_PATH}         C:/MT_APP/app-test/app-tester/apps/app.apk
+# ${APP_PACKAGE}      br.gov.mt.cepromat.mtcidadao
+# ${APP_ACTIVITY}     br.gov.mt.cepromat.mtcidadao.MainActivity
+# ${APP_PACKAGE}      br.gov.mt.cepromat.mtcidadao
+# ${APP_ACTIVITY}     br.gov.mt.cepromat.mtcidadao.MainActivity
+
+# *** Keywords ***
+# abrir app
+#     Open Application    http://localhost:4723/wd/hub
+#     ...    deviceName=${DEVICE_NAME}
+#     ...    platformName=${PLATFORM_NAME}
+#     ...    app=${APP_PATH}
+#     ...    appPackage=${APP_PACKAGE}
+#     ...    appActivity=${APP_ACTIVITY}
+#     ...    uiautomator2ServerInstallTimeout=60000
+#     ...    adbExecTimeout=60000
+#     ...    autoGrantPermissions=true
+#     ...    isHeadless=true
+#     ...    uiautomator2ServerInstallTimeout=60000
+#     ...    automationName=UiAutomator2
+
+#     Set Appium Timeout    5s
 
 fechar app
     clicar no botao inicio
