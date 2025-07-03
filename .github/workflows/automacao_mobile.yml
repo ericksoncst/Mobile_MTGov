@@ -38,6 +38,12 @@ jobs:
         with:
           android-sdk-file: commandlinetools-linux-9477386_latest.zip
 
+      - name: Configure Android environment
+        run: |
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "ANDROID_AVD_HOME=$ANDROID_HOME/avd" >> $GITHUB_ENV
+          mkdir -p $ANDROID_HOME/avd
+
       - name: Accept licenses and install tools
         run: |
           yes | sdkmanager --licenses
@@ -46,9 +52,18 @@ jobs:
           echo "$ANDROID_HOME/emulator" >> $GITHUB_PATH
           echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
 
-      - name: Create AVD
+      - name: Create and verify AVD
         run: |
-          echo no | avdmanager create avd -n "Pixel_7_Pro_API_34" -k "system-images;android-34;google_apis;x86_64" --device "pixel_7_pro"
+          echo no | avdmanager create avd \
+            -n Pixel_7_Pro_API_34 \
+            -k "system-images;android-34;google_apis;x86_64" \
+            --device "pixel_7_pro" \
+            --path $ANDROID_AVD_HOME/Pixel_7_Pro_API_34.avd
+          
+          # Verify AVD creation
+          emulator -list-avds
+          ls -la $ANDROID_AVD_HOME/
+          cat $ANDROID_AVD_HOME/Pixel_7_Pro_API_34.avd/config.ini
 
       - name: Set up Node.js
         uses: actions/setup-node@v3
@@ -68,11 +83,17 @@ jobs:
 
       - name: Run tests
         run: |
-          # Start emulator
-          emulator -avd Pixel_7_Pro_API_34 -no-audio -no-window -no-snapshot -no-boot-anim &
-          adb wait-for-device
+          # Start emulator with explicit paths
+          $ANDROID_HOME/emulator/emulator \
+            -avd Pixel_7_Pro_API_34 \
+            -no-audio \
+            -no-window \
+            -no-snapshot \
+            -no-boot-anim \
+            -writable-system \
+            -gpu swiftshader_indirect &
           
-          # Wait for device to be fully booted
+          adb wait-for-device
           adb shell 'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 1; done; input keyevent 82'
           
           # Install APK
