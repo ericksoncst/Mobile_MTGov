@@ -6,7 +6,7 @@ Resource   ../common/main.resource
 ${REMOTE_URL}        http://localhost:4723/wd/hub
 ${PLATFORM_NAME}     Android
 ${DEVICE_NAME}       emulator-5554
-${APP}               apps/app.apk
+${APP}    ${EXECDIR}/apps/app.apk
 ${APP_PACKAGE}       br.gov.mt.cepromat.mtcidadao
 ${APP_ACTIVITY}      br.gov.mt.cepromat.mtcidadao.MainActivity
 
