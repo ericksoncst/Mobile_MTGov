@@ -1,5 +1,10 @@
 FROM ubuntu:20.04
 
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN ln -fs /usr/share/zoneinfo/America/Sao_Paulo /etc/localtime && \
+    dpkg-reconfigure --frontend noninteractive tzdata
+
 # Instalação de dependências
 RUN apt-get update && \
     apt-get install -y python3-pip nodejs npm curl && \
