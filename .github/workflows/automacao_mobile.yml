@@ -1,78 +1,51 @@
-name: Testes Mobile com Emulador Android
+name: Testes Mobile com BrowserStack
 
 on:
   push:
     branches: [main]
   pull_request:
+    branches: [main]
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-
-    services:
-      appium:
-        image: appium/appium:latest
-        ports:
-          - 4723:4723
 
     steps:
-      - uses: actions/checkout@v4
-      - name: Configurar Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'zulu'
-          java-version: '17'
+      - name: 📥 Checkout do repositório
+        uses: actions/checkout@v4
 
-      - name: 🤖 Iniciar Emulador Android
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 30
-          arch: x86
-          target: google_apis_playstore
-          profile: "Nexus 6"
-          disable-animations: true
-          emulator-options: >
-            -no-window
-            -gpu swiftshader_indirect
-            -no-audio
-            -no-boot-anim
-            -no-snapshot
-            -no-metrics
-          script: echo "✅ Emulador Android pronto"
-
-      - name: Validar conexão com ADB
-        run: |
-          adb kill-server
-          adb start-server
-          adb devices
-
-      - name: 📦 Instalar dependências Python
+      - name: 🐍 Configurar ambiente Python
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
           pip install robotframework robotframework-appiumlibrary Appium-Python-Client==2.7.1
 
-      - name: 📱 Instalar APK no emulador
+      - name: 📱 Enviar APK para o BrowserStack
+        id: upload_apk
         run: |
-          adb install -r apps/app.apk || true
-          sleep 10
+          APK_PATH="apps/app.apk"
+          RESPONSE=$(curl -u "${{ secrets.BROWSERSTACK_USERNAME }}:${{ secrets.BROWSERSTACK_ACCESS_KEY }}" \
+            -X POST "https://api-cloud.browserstack.com/app-automate/upload" \
+            -F "file=@${APK_PATH}")
+          echo "apk_url=$(echo $RESPONSE | jq -r .app_url)" >> $GITHUB_ENV
 
-      - name: ▶️ Rodar testes com Robot Framework
+      - name: ▶️ Rodar testes Robot Framework
         env:
-          APPIUM_URL: http://localhost:4723/wd/hub
+          REMOTE_URL: http://hub-cloud.browserstack.com/wd/hub
           PLATFORM_NAME: Android
-          DEVICE_NAME: emulator-5554
-          APP_PATH: ${{ github.workspace }}/apps/app.apk
+          DEVICE_NAME: Google Pixel 6
+          PLATFORM_VERSION: 12.0
+          APP: ${{ env.apk_url }}
           APP_PACKAGE: br.gov.mt.cepromat.mtcidadao
           APP_ACTIVITY: br.gov.mt.cepromat.mtcidadao.MainActivity
+          BROWSERSTACK_USERNAME: ${{ secrets.BROWSERSTACK_USERNAME }}
+          BROWSERSTACK_ACCESS_KEY: ${{ secrets.BROWSERSTACK_ACCESS_KEY }}
         run: |
           robot \
-            --outputdir results \
-            --variable APPIUM_URL:$APPIUM_URL \
+            --variable REMOTE_URL:$REMOTE_URL \
             --variable PLATFORM_NAME:$PLATFORM_NAME \
             --variable DEVICE_NAME:$DEVICE_NAME \
-            --variable APP_PATH:$APP_PATH \
+            --variable PLATFORM_VERSION:$PLATFORM_VERSION \
+            --variable APP:$APP \
             --variable APP_PACKAGE:$APP_PACKAGE \
             --variable APP_ACTIVITY:$APP_ACTIVITY \
             test_cases/
@@ -81,5 +54,8 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-results
-          path: results/
+          name: resultados
+          path: |
+            output.xml
+            report.html
+            log.html
