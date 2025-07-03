@@ -15,7 +15,6 @@ abrir app
     ${options}=    Create Dictionary
     ...    platformName=${PLATFORM_NAME}
     ...    deviceName=${DEVICE_NAME}
-    ...    app=${APP}
     ...    appPackage=${APP_PACKAGE}
     ...    appActivity=${APP_ACTIVITY}
     ...    automationName=UiAutomator2

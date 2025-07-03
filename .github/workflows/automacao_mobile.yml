@@ -53,6 +53,7 @@ jobs:
           arch: x86_64
           profile: pixel_4
           script: |
+            echo "Waiting for device..."
             adb wait-for-device
             until adb shell getprop sys.boot_completed | grep -m 1 "1"; do
               echo "Waiting for emulator boot..."
@@ -62,11 +63,14 @@ jobs:
             echo "Unlocking emulator screen..."
             adb shell input keyevent 82 || true
 
+            echo "Installing APK..."
+            adb install -r ./apps/app.apk
+
             echo "Running Robot Framework tests..."
             robot -d reports \
               -v APPIUM_PORT:4723 \
               -v PLATFORM_VERSION:11.0 \
-              -v DEVICE_NAME:Pixel_4_API_30 \
+              -v DEVICE_NAME:emulator-5554 \
               test_cases/
 
       - name: Upload Robot Framework reports
