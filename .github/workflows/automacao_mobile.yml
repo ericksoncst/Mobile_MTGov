@@ -48,7 +48,8 @@ jobs:
         run: |
           yes | sdkmanager --licenses
           sdkmanager "platform-tools" "emulator" "platforms;android-30"
-          sdkmanager "system-images;android-30;default;x86"
+          # Using Google APIs image instead of default
+          sdkmanager "system-images;android-30;google_apis;x86"
           echo "$ANDROID_HOME/emulator" >> $GITHUB_PATH
           echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
 
@@ -56,15 +57,15 @@ jobs:
         run: |
           echo no | avdmanager create avd \
             -n TestAVD \
-            -k "system-images;android-30;default;x86" \
+            -k "system-images;android-30;google_apis;x86" \
             --device "Nexus 5" \
             --path $ANDROID_AVD_HOME/TestAVD.avd
           
-          # Modify config.ini to disable problematic features
+          # Modify config.ini for better compatibility
           echo "hw.cpu.ncore=2" >> $ANDROID_AVD_HOME/TestAVD.avd/config.ini
           echo "hw.cpu.arch=x86" >> $ANDROID_AVD_HOME/TestAVD.avd/config.ini
-          echo "hw.cpu.model=athlon" >> $ANDROID_AVD_HOME/TestAVD.avd/config.ini
           echo "vm.heapSize=256" >> $ANDROID_AVD_HOME/TestAVD.avd/config.ini
+          echo "disk.dataPartition.size=800M" >> $ANDROID_AVD_HOME/TestAVD.avd/config.ini
           
           # Verify AVD creation
           emulator -list-avds
@@ -88,7 +89,7 @@ jobs:
 
       - name: Run tests
         run: |
-          # Start emulator with maximum compatibility settings
+          # Start emulator with software rendering
           $ANDROID_HOME/emulator/emulator \
             -avd TestAVD \
             -no-audio \
@@ -96,16 +97,11 @@ jobs:
             -no-snapshot \
             -no-boot-anim \
             -no-accel \
-            -gpu off \
+            -gpu swiftshader_indirect \
             -memory 2048 \
-            -partition-size 1024 \
-            -feature -GLESDynamicVersion \
-            -skip-adb-auth \
-            -no-snapstorage \
-            -no-jni \
-            -qemu -m 2048 -enable-kvm &
+            -partition-size 1024 &
           
-          # Wait for emulator with timeout
+          # Wait for emulator with timeout (5 minutes)
           timeout 300 bash -c 'until adb shell getprop sys.boot_completed 2>/dev/null | grep -q 1; do sleep 5; echo "Waiting for emulator..."; done'
           
           # Unlock device
