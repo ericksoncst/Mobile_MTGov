@@ -1,26 +1,3 @@
-name: Automação Mobile
-
-on:
-  push:
-    branches:
-      - main
-  pull_request:
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-
-    services:
-      appium:
-        image: appium/appium:latest
-        ports:
-          - 4723:4723
-        options: >-
-          --health-cmd "curl --fail http://localhost:4723/wd/hub/status || exit 1"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -39,4 +16,4 @@ jobs:
         env:
           APPIUM_REMOTE_URL: http://appium:4723/wd/hub
         run: |
-          robot -v REMOTE_URL:$APPIUM_REMOTE_URL tests/
+          robot -v REMOTE_URL:http://appium:4723/wd/hub tests/
