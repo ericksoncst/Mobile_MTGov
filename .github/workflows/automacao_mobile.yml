@@ -37,6 +37,6 @@ jobs:
 
       - name: Run Robot Framework tests
         env:
-          APPIUM_REMOTE_URL: http://localhost:4723/wd/hub
+          APPIUM_REMOTE_URL: http://appium:4723/wd/hub
         run: |
           robot -v REMOTE_URL:$APPIUM_REMOTE_URL tests/
