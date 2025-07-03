@@ -21,7 +21,7 @@ jobs:
 
       - name: ▶️ Executar testes no container
         run: |
-          docker run -p 4723:4723 --name emulador-testes robot-tests
+          docker run --name emulador-testes robot-tests
 
       - name: 📁 Copiar resultados do container
         if: always()
