@@ -10,13 +10,21 @@ RUN apt-get update && \
 ENV ANDROID_HOME=/opt/android-sdk
 ENV PATH="${PATH}:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${ANDROID_HOME}/emulator"
 
-RUN mkdir -p ${ANDROID_HOME}/cmdline-tools && \
-    cd ${ANDROID_HOME}/cmdline-tools && \
-    wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O tools.zip && \
-    unzip tools.zip -d latest && rm tools.zip && \
-    yes | sdkmanager --licenses && \
-    sdkmanager "platform-tools" "platforms;android-30" "system-images;android-30;google_apis;x86_64" "emulator"
+# Definir variáveis
+ENV ANDROID_HOME=/opt/android-sdk
+ENV PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator
 
+# Instalar Android Command Line Tools
+RUN mkdir -p $ANDROID_HOME/cmdline-tools && \
+    cd $ANDROID_HOME/cmdline-tools && \
+    wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O tools.zip && \
+    unzip tools.zip -d latest && \
+    rm tools.zip
+
+# Aceitar licenças e instalar SDKs
+RUN yes | sdkmanager --licenses && \
+    sdkmanager "platform-tools" "platforms;android-30" "system-images;android-30;google_apis;x86_64" "emulator"
+    
 # Instalar Appium e lib para subir emulador
 RUN npm install -g appium start-android-emulator
 
