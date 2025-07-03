@@ -54,26 +54,26 @@ jobs:
           arch: x86_64
           profile: pixel_4
           disable-animations: true
-        script: |
-          echo "Waiting for boot..."
-          adb wait-for-device
-          until adb shell getprop sys.boot_completed | grep -m 1 "1"; do
-            echo "Waiting for sys.boot_completed...";
-            sleep 5
-          done
+          script: |
+            echo "Waiting for boot..."
+            adb wait-for-device
+            until adb shell getprop sys.boot_completed | grep -m 1 "1"; do
+              echo "Waiting for sys.boot_completed...";
+              sleep 5
+            done
 
-          echo "Waiting a bit more for system to stabilize..."
-          sleep 10
+            echo "Waiting a bit more for system to stabilize..."
+            sleep 10
 
-          echo "Unlocking screen..."
-          adb shell input keyevent 82
+            echo "Unlocking screen..."
+            adb shell input keyevent 82
 
-          echo "Installing APK..."
-          adb install -t -g apps/app.apk
+            echo "Installing APK..."
+            adb install -t -g apps/app.apk
 
-          echo "Running tests..."
-          robot -d ./reports -v APPIUM_PORT:4725 test_cases/
-
+            echo "Running tests..."
+            robot -d ./reports -v APPIUM_PORT:4725 test_cases/
+     
       - name: Upload test results
         uses: actions/upload-artifact@v4
         if: always()
