@@ -11,6 +11,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Get root directory
+        id: root
+        run: echo "ROOT=$(pwd)" >> $GITHUB_ENV
+
       - name: Use Python 3.9
         uses: actions/setup-python@v5
         with:
@@ -21,7 +25,7 @@ jobs:
         run: |
           pip install robotframework
           pip install robotframework-appiumlibrary
-          pip install -r requirements.txt
+          pip install -r ${{ env.ROOT }}/requirements.txt
 
       - name: Set up Java
         uses: actions/setup-java@v3
@@ -31,6 +35,20 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          android-sdk-file: commandlinetools-linux-9477386_latest.zip
+
+      - name: Accept licenses and install tools
+        run: |
+          yes | sdkmanager --licenses
+          sdkmanager "platform-tools" "emulator" "platforms;android-34"
+          sdkmanager "system-images;android-34;google_apis;x86_64"
+          echo "$ANDROID_HOME/emulator" >> $GITHUB_PATH
+          echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
+
+      - name: Create AVD
+        run: |
+          echo no | avdmanager create avd -n "Pixel_7_Pro_API_34" -k "system-images;android-34;google_apis;x86_64" --device "pixel_7_pro"
 
       - name: Set up Node.js
         uses: actions/setup-node@v3
@@ -40,49 +58,32 @@ jobs:
       - name: Install Appium
         run: |
           npm install -g appium
-
-      - name: Install UiAutomator2
-        run: |
           appium driver install uiautomator2
 
-      - name: Start up Appium
+      - name: Start Appium server
         run: |
-          nohup appium -p 4725 -pa /wd/hub &
+          nohup appium -p 4725 -pa /wd/hub --log-timestamp --local-timezone > ${{ env.ROOT }}/appium.log 2>&1 &
+          sleep 5
+          cat ${{ env.ROOT }}/appium.log
 
-      - name: Install Android SDK system image
+      - name: Run tests
         run: |
-          sdkmanager --install "system-images;android-34;google_apis;x86_64"
-
-      - name: Create Device
-        run: |
-          echo no | avdmanager create avd -n "Pixel_7_Pro_API_34" -k "system-images;android-34;google_apis;x86_64" -d pixel_7_pro
-
-      - name: Enable KVM group perms
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-
-      - name: Run Android Emulator and execute Robot tests
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 34
-          target: google_apis
-          arch: x86_64
-          profile: pixel_6_pro
-          script: |
-            avdmanager list device
-            # Start emulator
-            emulator -avd Pixel_7_Pro_API_34 -no-audio -no-window -no-snapshot -no-boot-anim &
-            adb wait-for-device
-            # Install APK
-            adb install apps/app.apk
-            # Run Robot Framework tests
-            robot -d ./reports -v APPIUM_PORT:4725 -v APK_PATH:apps/app.apk test_cases/
+          # Start emulator
+          emulator -avd Pixel_7_Pro_API_34 -no-audio -no-window -no-snapshot -no-boot-anim &
+          adb wait-for-device
+          
+          # Wait for device to be fully booted
+          adb shell 'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 1; done; input keyevent 82'
+          
+          # Install APK
+          adb install -t -g ${{ env.ROOT }}/apps/app.apk
+          
+          # Run tests
+          robot -d ${{ env.ROOT }}/reports -v APPIUM_PORT:4725 -v APK_PATH:${{ env.ROOT }}/apps/app.apk ${{ env.ROOT }}/test_cases/
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: reports
-          path: reports
+          path: ${{ env.ROOT }}/reports
