@@ -27,7 +27,7 @@ jobs:
       - name: 🤖 Iniciar Emulador Android
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 31
+          api-level: 30
           arch: x86
           target: google_apis_playstore
           profile: "Nexus 6"
