@@ -6,8 +6,8 @@ on:
   pull_request:
     branches: [ main ]
 
-  jobs:
-   run-tests:
+jobs:
+  run-tests:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout do código
@@ -25,7 +25,6 @@ on:
           api-level: 30
           build-tools: 30.0.3
           cmdline-tools-version: latest
-
 
       - name: 📱 Instalar Android SDK e ferramentas
         run: |
