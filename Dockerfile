@@ -9,49 +9,48 @@ RUN apt-get update && \
 # Configurando Android SDK
 ENV ANDROID_HOME=/opt/android-sdk
 ENV PATH="${PATH}:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${ANDROID_HOME}/emulator"
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+ENV PATH="$JAVA_HOME/bin:$PATH"
 
 RUN mkdir -p ${ANDROID_HOME}/cmdline-tools && \
     cd ${ANDROID_HOME}/cmdline-tools && \
     wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O tools.zip && \
     unzip tools.zip && \
     mv cmdline-tools latest && \
-    rm tools.zip
+    rm tools.zip && \
+    chmod +x ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager
 
-# Instalando SDKs necessários
-# Usar imagem ARM em vez de x86_64
+# Testa sdkmanager (opcional)
+RUN ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --version
 
-RUN yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses && \
-    $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+# Instalando SDKs necessários (imagem ARM para evitar KVM)
+RUN yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --licenses && \
+    ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager \
         "platform-tools" \
         "platforms;android-30" \
         "system-images;android-30;google_apis;armeabi-v7a" \
         "emulator"
 
-# Criar AVD com imagem ARM
-RUN echo "no" | avdmanager create avd -n testEmulator -k "system-images;android-30;google_apis;armeabi-v7a" --device "pixel" --force
+# Criar AVD com imagem ARM (pixel)
+RUN echo "no" | ${ANDROID_HOME}/cmdline-tools/latest/bin/avdmanager create avd -n testEmulator -k "system-images;android-30;google_apis;armeabi-v7a" --device "pixel" --force
 
-# Instalando Appium e dependências Node
+# Instalar Appium globalmente
 RUN npm install -g appium
-
-# Criar AVD
-RUN echo "no" | ${ANDROID_HOME}/cmdline-tools/latest/bin/avdmanager create avd \
-      -n testEmulator -k "system-images;android-30;google_apis;x86_64" \
-      --device "pixel" --force
 
 # Diretório de trabalho
 WORKDIR /app
 
-# Copia os arquivos do projeto
+# Copiar arquivos do projeto
 COPY . .
 
-# Instalar dependências Python
+# Criar ambiente Python e instalar dependências
 RUN python3 -m venv venv && \
     ./venv/bin/pip install --upgrade pip && \
     ./venv/bin/pip install -r requirements.txt
 
 # Comando de execução
 CMD bash -c "\
-    $ANDROID_HOME/emulator/emulator -avd testEmulator -no-audio -no-window & \
+    ${ANDROID_HOME}/emulator/emulator -avd testEmulator -no-audio -no-window & \
     emulator_pid=\$! && \
     sleep 60 && \
     appium & \
