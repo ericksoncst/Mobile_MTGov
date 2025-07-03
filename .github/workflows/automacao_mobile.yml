@@ -32,5 +32,4 @@ jobs:
 
       - name: Run Robot Framework tests
         run: |
-          . venv/bin/activate
           robot test_cases/
