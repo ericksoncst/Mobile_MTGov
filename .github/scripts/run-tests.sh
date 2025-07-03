@@ -13,9 +13,9 @@ done
 echo "Extra delay to allow system services to stabilize..."
 sleep 15
 
-echo "Waiting for Android system to be fully operational..."
-until adb shell dumpsys activity activities | grep -m 1 "ResumedActivity"; do
-  echo "Still waiting for system readiness..."
+# Aguarda launcher ser iniciado
+until adb shell pidof com.android.launcher3 > /dev/null; do
+  echo "Waiting for launcher..."
   sleep 5
 done
 
@@ -23,7 +23,7 @@ echo "Unlocking device..."
 adb shell input keyevent 82 || true
 
 echo "Installing APK..."
-adb install -r ./apps/app.apk
+adb install -r "$(pwd)/apps/app.apk"
 
 echo "Running Robot Framework tests..."
 robot -d reports \
