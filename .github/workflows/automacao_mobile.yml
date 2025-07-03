@@ -6,21 +6,8 @@ on:
   pull_request:
     branches: [ main ]
 
-jobs:
-  run-tests:
-    runs-on: ubuntu-latest
-
-    env:
-      ANDROID_SDK_ROOT: ${{ runner.temp }}/android-sdk
-      JAVA_HOME: /usr/lib/jvm/java-11-openjdk-amd64
-      PATH: ${{ runner.temp }}/android-sdk/cmdline-tools/latest/bin:${{ runner.temp }}/android-sdk/platform-tools:${{ runner.temp }}/android-sdk/emulator:$PATH
-
-    steps:
-      - name: 📥 Checkout do repositório
-        uses: actions/checkout@v4
-
-      jobs:
-  run-tests:
+  jobs:
+   run-tests:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout do código
