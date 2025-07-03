@@ -9,7 +9,7 @@ on:
 jobs:
   android-tests:
     runs-on: ubuntu-latest
-    timeout-minutes: 45  # Increased timeout for emulator startup
+    timeout-minutes: 45
 
     steps:
       - name: 📥 Checkout repository
@@ -21,36 +21,48 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: 🔧 Install Android SDK and Platform Tools
+      - name: 🔧 Install Android SDK and Tools
         run: |
-          # Clean previous installation
-          rm -rf ~/android-sdk || true
+          # Set up directories
+          export ANDROID_HOME="$HOME/android-sdk"
+          mkdir -p "$ANDROID_HOME"
           
-          # Create fresh SDK directory
-          mkdir -p ~/android-sdk
-          cd ~/android-sdk
-          
-          # Download and extract command line tools
+          # Download command line tools
+          cd "$ANDROID_HOME"
           wget -q https://dl.google.com/android/repository/commandlinetools-linux-10406996_latest.zip
-          unzip -q commandlinetools-linux-10406996_latest.zip -d cmdline-tools
-          mv cmdline-tools/cmdline-tools cmdline-tools/latest
+          unzip -q commandlinetools-linux-10406996_latest.zip
+          rm commandlinetools-linux-10406996_latest.zip
           
-          # Set environment variables
-          echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
-          echo "$HOME/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
+          # Move tools to correct location
+          mkdir -p cmdline-tools/latest
+          mv tools/* cmdline-tools/latest/
+          rm -rf tools
           
-          # Install platform-tools (includes ADB)
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools"
+          # Add to PATH
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
           echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
+          echo "$ANDROID_HOME/emulator" >> $GITHUB_PATH
+          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+
+      - name: 📦 Install Android Platform Tools
+        run: |
+          # Accept licenses first
+          mkdir -p "$ANDROID_HOME/licenses"
+          echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > "$ANDROID_HOME/licenses/android-sdk-license"
           
-          # Verify ADB installation
+          # Install necessary packages
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+            "platform-tools" \
+            "emulator" \
+            "platforms;android-30" \
+            "system-images;android-30;google_apis;x86_64"
+          
+          # Verify installation
           adb version
+          emulator -version
 
       - name: 📱 Create and Start Emulator
         run: |
-          # Install emulator and system image
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "emulator" "system-images;android-30;google_apis;x86_64"
-          
           # Create AVD
           echo "no" | $ANDROID_HOME/cmdline-tools/latest/bin/avdmanager create avd \
             --name test \
@@ -58,7 +70,7 @@ jobs:
             --device "pixel_4" \
             --force
           
-          # Start emulator in background
+          # Start emulator
           nohup $ANDROID_HOME/emulator/emulator \
             -avd test \
             -no-audio \
@@ -66,8 +78,8 @@ jobs:
             -gpu swiftshader_indirect \
             -camera-back none \
             -camera-front none > /dev/null 2>&1 &
-          
-          # Wait for emulator to fully boot
+            
+          # Wait for emulator
           adb wait-for-device
           while [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" != "1" ]; do
             sleep 10
@@ -78,9 +90,6 @@ jobs:
           adb shell settings put global window_animation_scale 0
           adb shell settings put global transition_animation_scale 0
           adb shell settings put global animator_duration_scale 0
-          
-          # Verify emulator is ready
-          adb devices
 
       - name: 🌐 Install Appium
         run: |
@@ -94,9 +103,8 @@ jobs:
           echo "APPIUM_PID=$!" >> $GITHUB_ENV
           sleep 15
           echo "Appium server started with PID $APPIUM_PID"
-          cat appium.log
 
-      - name: 🐍 Setup Python Environment
+      - name: 🐍 Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
@@ -110,22 +118,18 @@ jobs:
         timeout-minutes: 20
         run: |
           mkdir -p results
-          echo "🔍 Verify Appium connection..."
-          curl -f http://localhost:4723/wd/hub/status || (cat appium.log && exit 1)
-          
-          echo "🚦 Verify emulator connection..."
+          echo "🔍 Verifying connections..."
           adb devices
-          adb shell getprop ro.build.version.release
+          curl -f http://localhost:4723/wd/hub/status
           
           echo "🏃 Starting tests..."
           robot --variable DEVICE_NAME:emulator-5554 \
                 --variable PLATFORM_VERSION:11.0 \
                 --variable APPIUM_URL:http://localhost:4723/wd/hub \
                 --outputdir results \
-                --exitonfailure \
                 test_cases || true
 
-      - name: 📤 Upload Test Results
+      - name: 📤 Upload Results
         uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -134,12 +138,8 @@ jobs:
             results/*
             appium.log
 
-      - name: 🛑 Cleanup Processes
+      - name: 🛑 Cleanup
         if: always()
         run: |
-          echo "Stopping Appium..."
           kill $APPIUM_PID || true
-          echo "Stopping emulator..."
           adb emu kill || true
-          echo "List of running processes:"
-          ps aux
