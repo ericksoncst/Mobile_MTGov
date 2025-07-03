@@ -1,67 +1,56 @@
-name: Android App Automation
+name: Testes Mobile com Android Emulator
 
 on:
   push:
-  workflow_dispatch:
+    branches: [main]
+  pull_request:
+    branches: [main]
 
 jobs:
-  android-robot-test:
+  test:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     steps:
-      - name: Checkout code
+      - name: 📥 Checkout do repositório
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.9
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.9'
-          cache: 'pip'
-
-      - name: Install Python dependencies
-        run: |
-          pip install robotframework
-          pip install robotframework-appiumlibrary
-          pip install -r requirements.txt || true
-
-      - name: Set up Java
-        uses: actions/setup-java@v3
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Set up Node.js (for Appium)
-        uses: actions/setup-node@v3
-        with:
-          node-version: 'lts/*'
-
-      - name: Install Appium and drivers
-        run: |
-          npm install -g appium
-          appium driver install uiautomator2
-
-      - name: Start Appium Server
-        run: |
-          nohup appium -p 4723 -pa /wd/hub > appium.log 2>&1 &
-
-      - name: Run Emulator and Execute Robot Tests
+      - name: 📦 Instalar dependências Android, Appium e rodar testes
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 30
+          api-level: 31
           target: google_apis
           arch: x86_64
-          profile: pixel_4
-          disable-animations: false
-          script:  |
-            chmod +x .github/scripts/run-tests.sh
-            .github/scripts/run-tests.sh
+          force-avd-creation: true
+          script: |
+            echo "⚙️ Iniciando Appium localmente..."
+            npm install -g appium
+            appium --log-level error &
 
-      - name: Upload test results
+            echo "🐍 Instalando dependências Python"
+            python -m pip install --upgrade pip
+            pip install robotframework robotframework-appiumlibrary Appium-Python-Client==3.1.0
+            pip install robotframework-datadriver
+
+            echo "📱 Instalando APK"
+            adb install $(pwd)/apps/app.apk
+
+            echo "🧪 Rodando testes"
+            robot --outputdir results \
+              --variable REMOTE_URL:"http://localhost:4723/wd/hub" \
+              --variable PLATFORM_NAME:"Android" \
+              --variable DEVICE_NAME:"emulator-5554" \
+              --variable APP:"$(pwd)/apps/app.apk" \
+              --variable APP_PACKAGE:"br.gov.mt.cepromat.mtcidadao" \
+              --variable APP_ACTIVITY:"br.gov.mt.cepromat.mtcidadao.MainActivity" \
+              test_cases/
+
+      - name: 📂 Upload dos resultados
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: robot-reports
-          path: reports
+          name: resultados
+          path: |
+            results/output.xml
+            results/report.html
+            results/log.html
