@@ -1,4 +1,4 @@
-name: Mobile Tests with Appium
+name: Android Emulator Tests with Appium
 
 on:
   push:
@@ -9,26 +9,116 @@ on:
 jobs:
   android-tests:
     runs-on: ubuntu-latest
-    container:
-      image: your-custom-image
-      options: --privileged
+    timeout-minutes: 30
+
+    services:
+      appium:
+        image: appium/appium
+        ports:
+          - 4723:4723
 
     steps:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
 
-      - name: 🐳 Run tests
-        run: docker run \
-          --name test-runner \
-          -v $(pwd)/results:/app/results \
-          -e APPIUM_HOST=localhost \
-          -e APPIUM_PORT=4723 \
-          --rm \
-          your-custom-image
+      - name: ⚙️ Setup Java (required for Android tools)
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '11'
+
+      - name: 📦 Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            python3-pip \
+            nodejs \
+            npm \
+            qemu-kvm \
+            libvirt-daemon-system \
+            libvirt-clients \
+            bridge-utils \
+            virtinst \
+            libgbm-dev \
+            libnss3 \
+            libasound2
+
+      - name: 🔧 Setup Android SDK
+        uses: android-actions/setup-android@v2
+
+      - name: 📱 Install Android Emulator
+        run: |
+          yes | sdkmanager --install "platform-tools" "emulator"
+          yes | sdkmanager --install "system-images;android-30;google_apis;x86_64"
+          yes | sdkmanager --install "platforms;android-30"
+          echo "ANDROID_HOME=${ANDROID_HOME}" >> $GITHUB_ENV
+          echo "${ANDROID_HOME}/emulator" >> $GITHUB_PATH
+          echo "${ANDROID_HOME}/platform-tools" >> $GITHUB_PATH
+
+      - name: 🏗 Create Android AVD
+        run: |
+          avdmanager create avd \
+            --name test \
+            --package "system-images;android-30;google_apis;x86_64" \
+            --device "pixel_4" \
+            --force
+
+      - name: 🚀 Start Android Emulator
+        run: |
+          emulator -avd test \
+            -no-audio \
+            -no-window \
+            -gpu swiftshader_indirect \
+            -camera-back none \
+            -camera-front none &
+          adb wait-for-device
+          while [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" != "1" ]; do
+            sleep 5
+            echo "⌛ Waiting for emulator to boot..."
+          done
+          adb shell settings put global window_animation_scale 0
+          adb shell settings put global transition_animation_scale 0
+          adb shell settings put global animator_duration_scale 0
+
+      - name: 🌐 Install Appium
+        run: |
+          sudo npm install -g appium
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: 📦 Install Python dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install robotframework robotframework-appiumlibrary
+
+      - name: 🧪 Run tests
+        run: |
+          mkdir -p results
+          echo "🧪 Running tests..."
+          robot --variable DEVICE_NAME:test \
+                --variable PLATFORM_VERSION:11.0 \
+                --variable APPIUM_HOST:127.0.0.1 \
+                --variable APPIUM_PORT:4723 \
+                --outputdir results \
+                test_cases || true
 
       - name: 📤 Upload test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         if: always()
         with:
           name: test-results
-          path: results/*
+          path: |
+            results/output.xml
+            results/report.html
+            results/log.html
+
+      - name: 🚨 Capture emulator logs on failure
+        if: failure()
+        run: |
+          adb logcat -d > emulator.log
+          echo "EMULATOR LOGS:"
+          cat emulator.log
+        continue-on-error: true
