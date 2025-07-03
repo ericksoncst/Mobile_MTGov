@@ -13,7 +13,7 @@ ${APP_ACTIVITY}     br.gov.mt.cepromat.mtcidadao.MainActivity
 
 *** Keywords ***
 abrir app
-    Open Application    http://localhost:4723/wd/hub
+    Open Application    http://127.0.0.1:4723/wd/hub
     ...    deviceName=${DEVICE_NAME}
     ...    platformName=${PLATFORM_NAME}
     ...    app=${APP_PATH}
