@@ -15,14 +15,23 @@ jobs:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
 
-      - name: ⚙️ Setup Java
+      - name: ⚙️ Setup Java 17 (required for Android SDK)
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
-          java-version: '11'
+          java-version: '17'
 
       - name: 🔧 Install Android SDK
-        uses: android-actions/setup-android@v3
+        run: |
+          mkdir -p ~/android-sdk
+          cd ~/android-sdk
+          wget https://dl.google.com/android/repository/commandlinetools-linux-10406996_latest.zip
+          unzip commandlinetools-linux-10406996_latest.zip
+          mkdir cmdline-tools
+          mv tools cmdline-tools/latest
+          echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
+          echo "$HOME/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
+          echo "$HOME/android-sdk/platform-tools" >> $GITHUB_PATH
 
       - name: 📱 Setup Android Emulator
         uses: reactivecircus/android-emulator-runner@v2
@@ -30,7 +39,7 @@ jobs:
           api-level: 30
           arch: x86_64
           profile: Nexus 6
-          disable-animations: true  # Fixed typo (was disable-animations)
+          disable-animations: true
           script: echo "Emulator ready"
           emulator-options: >-
             -no-audio
@@ -38,19 +47,17 @@ jobs:
             -gpu swiftshader_indirect
             -camera-back none
             -camera-front none
-          working-directory: ./
 
       - name: 🌐 Install Appium
         run: |
           sudo npm install -g appium
           appium driver install uiautomator2
-          appium driver install xcuitest  # Optional for iOS if needed
 
       - name: 🚀 Start Appium Server
         run: |
           appium --relaxed-security --base-path /wd/hub &
           echo "APPIUM_PID=$!" >> $GITHUB_ENV
-          sleep 15  # Increased wait time for stability
+          sleep 15
 
       - name: 🐍 Setup Python
         uses: actions/setup-python@v4
