@@ -47,42 +47,15 @@ jobs:
         run: |
           nohup appium -p 4723 -pa /wd/hub > appium.log 2>&1 &
 
-      - name: Start Emulator in Background
-        run: |
-          echo "Starting emulator..."
-          $ANDROID_SDK_ROOT/emulator/emulator -avd test -no-audio -no-boot-anim -gpu swiftshader_indirect -no-window &
-          EMULATOR_PID=$!
-          echo "Waiting for emulator to be ready..."
-          adb wait-for-device
-
-          # Wait for boot completion
-          until adb shell getprop sys.boot_completed | grep -m 1 "1"; do
-            echo "Still waiting for boot..."
-            sleep 5
-          done
-
-          echo "Giving system time to stabilize..."
-          sleep 15
-
-          # Wait for activity manager to be resumed
-          until adb shell dumpsys activity activities | grep -m 1 "ResumedActivity"; do
-            echo "Waiting for system readiness..."
-            sleep 5
-          done
-
-          echo "Unlocking device..."
-          adb shell input keyevent 82 || true
-
-      - name: Install APK and Run Tests
-        run: |
-          echo "Installing APK..."
-          adb install -r ./apps/app.apk
-
-          echo "Running Robot Framework tests..."
-          robot -d reports \
-            -v REMOTE_URL:http://localhost:4723/wd/hub \
-            -v DEVICE_NAME:emulator-5554 \
-            test_cases/
+      - name: Run Emulator and Execute Robot Tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          target: google_apis
+          arch: x86_64
+          profile: pixel_4
+          disable-animations: false
+          script: .github/scripts/run-tests.sh
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
