@@ -1,75 +1,42 @@
-name: Continuous Integration
+name: Android Emulator Test
 
 on:
-  push:
   workflow_dispatch:
+  push:
+
+env:
+  ANDROID_ARCH: x86_64
+  ANDROID_TARGET: google_apis_playstore
+  API_LEVEL: 33
+  ANDROID_BUILD_TOOLS_VERSION: 33.0.2
+  EMULATOR_NAME: nexus
+  EMULATOR_TIMEOUT: 350
+  APPIUM_PORT: 4725
 
 jobs:
-  execute_test:
-    runs-on: ubuntu-latest
-
+  robot-test:
+    timeout-minutes: 20
+    runs-on: macos-latest
+    
     steps:
       - uses: actions/checkout@v4
 
-      - name: Get root directory
-        id: root
-        run: echo "ROOT=$(pwd)" >> $GITHUB_ENV
-
-      - name: Use Python 3.9
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: 3.9
-          cache: 'pip'
+          python-version: '3.9'
 
       - name: Install Robot Framework and dependencies
         run: |
           pip install robotframework
           pip install robotframework-appiumlibrary
-          pip install -r ${{ env.ROOT }}/requirements.txt
+          pip install -r requirements.txt
 
       - name: Set up Java
         uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
           java-version: '17'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          android-sdk-file: commandlinetools-linux-9477386_latest.zip
-
-      - name: Configure Android environment
-        run: |
-          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
-          echo "ANDROID_AVD_HOME=$ANDROID_HOME/avd" >> $GITHUB_ENV
-          mkdir -p $ANDROID_HOME/avd
-
-      - name: Accept licenses and install tools
-        run: |
-          yes | sdkmanager --licenses
-          sdkmanager "platform-tools" "emulator" "platforms;android-30"
-          # Using Google APIs image instead of default
-          sdkmanager "system-images;android-30;google_apis;x86"
-          echo "$ANDROID_HOME/emulator" >> $GITHUB_PATH
-          echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
-
-      - name: Create and verify AVD
-        run: |
-          echo no | avdmanager create avd \
-            -n TestAVD \
-            -k "system-images;android-30;google_apis;x86" \
-            --device "Nexus 5" \
-            --path $ANDROID_AVD_HOME/TestAVD.avd
-          
-          # Modify config.ini for better compatibility
-          echo "hw.cpu.ncore=2" >> $ANDROID_AVD_HOME/TestAVD.avd/config.ini
-          echo "hw.cpu.arch=x86" >> $ANDROID_AVD_HOME/TestAVD.avd/config.ini
-          echo "vm.heapSize=256" >> $ANDROID_AVD_HOME/TestAVD.avd/config.ini
-          echo "disk.dataPartition.size=800M" >> $ANDROID_AVD_HOME/TestAVD.avd/config.ini
-          
-          # Verify AVD creation
-          emulator -list-avds
-          cat $ANDROID_AVD_HOME/TestAVD.avd/config.ini
 
       - name: Set up Node.js
         uses: actions/setup-node@v3
@@ -81,45 +48,66 @@ jobs:
           npm install -g appium
           appium driver install uiautomator2
 
+      - name: Configure Android environment
+        run: |
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/emulator:$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools/${{ env.ANDROID_BUILD_TOOLS_VERSION }}" >> $GITHUB_PATH
+
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses
+          sdkmanager --install "system-images;android-${{ env.API_LEVEL }};${{ env.ANDROID_TARGET }};${{ env.ANDROID_ARCH }}"
+          sdkmanager --install "platforms;android-${{ env.API_LEVEL }}"
+          sdkmanager --install "build-tools;${{ env.ANDROID_BUILD_TOOLS_VERSION }}"
+          sdkmanager --install "platform-tools"
+          sdkmanager --install "emulator"
+
+      - name: Create AVD
+        run: |
+          echo "no" | avdmanager create avd \
+            --force \
+            --name ${{ env.EMULATOR_NAME }} \
+            --package "system-images;android-${{ env.API_LEVEL }};${{ env.ANDROID_TARGET }};${{ env.ANDROID_ARCH }}" \
+            --abi "${{ env.ANDROID_TARGET }}/${{ env.ANDROID_ARCH }}"
+
       - name: Start Appium server
         run: |
-          nohup appium -p 4725 -pa /wd/hub --log-timestamp --local-timezone > ${{ env.ROOT }}/appium.log 2>&1 &
+          nohup appium -p ${{ env.APPIUM_PORT }} -pa /wd/hub --log-timestamp --local-timezone > appium.log 2>&1 &
           sleep 10
-          cat ${{ env.ROOT }}/appium.log
+          cat appium.log
 
-      - name: Run tests
+      - name: Launch emulator and run tests
         run: |
-          # Start emulator with software rendering
-          $ANDROID_HOME/emulator/emulator \
-            -avd TestAVD \
+          # Start emulator in background
+          emulator -avd ${{ env.EMULATOR_NAME }} \
             -no-audio \
             -no-window \
             -no-snapshot \
-            -no-boot-anim \
-            -no-accel \
             -gpu swiftshader_indirect \
-            -memory 2048 \
-            -partition-size 1024 &
+            -no-boot-anim &
           
-          # Wait for emulator with timeout (5 minutes)
-          timeout 300 bash -c 'until adb shell getprop sys.boot_completed 2>/dev/null | grep -q 1; do sleep 5; echo "Waiting for emulator..."; done'
+          # Wait for emulator to be ready
+          adb wait-for-device
+          timeout ${{ env.EMULATOR_TIMEOUT }} bash -c 'until adb shell getprop sys.boot_completed 2>/dev/null | grep -q 1; do sleep 5; echo "Waiting for emulator..."; done'
           
           # Unlock device
           adb shell input keyevent 82
           
           # Install APK
-          adb install -t -g ${{ env.ROOT }}/apps/app.apk
+          adb install -t -g apps/app.apk
           
-          # Run tests with increased timeout
-          robot --exitonfailure --exitonerror --timestampoutputs \
-            -d ${{ env.ROOT }}/reports \
-            -v APPIUM_PORT:4725 \
-            -v APK_PATH:${{ env.ROOT }}/apps/app.apk \
-            ${{ env.ROOT }}/test_cases/
+          # Run Robot Framework tests
+          robot -d reports \
+            -v APPIUM_PORT:${{ env.APPIUM_PORT }} \
+            -v PLATFORM_VERSION:${{ env.API_LEVEL }} \
+            -v DEVICE_NAME:${{ env.EMULATOR_NAME }} \
+            test_cases/
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: reports
-          path: ${{ env.ROOT }}/reports
+          name: test-reports
+          path: |
+            reports/
+            appium.log
