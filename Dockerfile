@@ -1,34 +1,24 @@
-FROM ubuntu:22.04
+FROM registry-gitlab.mti.mt.gov.br/docker-images/ubuntu
 
-# 1. Atualizar e instalar dependências
+# Instalando dependências
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-      openjdk-17-jdk \
-      wget \
-      unzip \
-      git \
-      curl \
-      python3 \
-      python3-pip \
-      python3-venv \
-      nodejs \
-      npm \
-      android-tools-adb && \
+    apt-get install -y nodejs npm python3-pip python3-venv android-tools-adb openjdk-17-jdk wget unzip && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# 2. Variáveis de ambiente do Android SDK
+# Configurando Android SDK
 ENV ANDROID_HOME=/opt/android-sdk
-ENV PATH=$PATH:$ANDROID_HOME/cmdline-tools/tools/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator
+ENV PATH="${PATH}:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${ANDROID_HOME}/emulator"
 
-# 3. Baixar e instalar o Command Line Tools do Android
-RUN mkdir -p $ANDROID_HOME/cmdline-tools && \
-    cd $ANDROID_HOME/cmdline-tools && \
+RUN mkdir -p ${ANDROID_HOME}/cmdline-tools && \
+    cd ${ANDROID_HOME}/cmdline-tools && \
     wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O tools.zip && \
-    unzip tools.zip -d tools && \
+    unzip tools.zip && \
+    mv cmdline-tools latest && \
     rm tools.zip
 
-# 4. Instalar os pacotes SDK (imagem ARM para evitar erro do KVM)
+# Instalando SDKs necessários
+# Usar imagem ARM em vez de x86_64
 RUN yes | $ANDROID_HOME/cmdline-tools/tools/bin/sdkmanager --licenses && \
     $ANDROID_HOME/cmdline-tools/tools/bin/sdkmanager \
         "platform-tools" \
@@ -36,35 +26,36 @@ RUN yes | $ANDROID_HOME/cmdline-tools/tools/bin/sdkmanager --licenses && \
         "system-images;android-30;google_apis;armeabi-v7a" \
         "emulator"
 
-# 5. Instalar Appium e CLI para iniciar emulador
-RUN npm install -g appium start-android-emulator
+# Criar AVD com imagem ARM
+RUN echo "no" | avdmanager create avd -n testEmulator -k "system-images;android-30;google_apis;armeabi-v7a" --device "pixel" --force
 
-# 6. Instalar dependências Python
+# Instalando Appium e dependências Node
+RUN npm install -g appium
+
+# Criar AVD
+RUN echo "no" | ${ANDROID_HOME}/cmdline-tools/latest/bin/avdmanager create avd \
+      -n testEmulator -k "system-images;android-30;google_apis;x86_64" \
+      --device "pixel" --force
+
+# Diretório de trabalho
 WORKDIR /app
-COPY ./requirements.txt .
+
+# Copia os arquivos do projeto
+COPY . .
+
+# Instalar dependências Python
 RUN python3 -m venv venv && \
     ./venv/bin/pip install --upgrade pip && \
     ./venv/bin/pip install -r requirements.txt
 
-# 7. Copiar arquivos da aplicação
-COPY . .
-
-# 8. Criar AVD
-RUN echo "no" | avdmanager create avd -n testEmulator -k "system-images;android-30;google_apis;armeabi-v7a" --device "pixel" --force
-
-# 9. Expor porta do Appium se necessário
-EXPOSE 4723
-
-# 10. Comando de entrada: start emulador, Appium e testes
+# Comando de execução
 CMD bash -c "\
-    start-android-emulator testEmulator --headless & \
+    $ANDROID_HOME/emulator/emulator -avd testEmulator -no-audio -no-window & \
     emulator_pid=\$! && \
-    echo '⌛ Aguardando emulador subir...' && \
     sleep 60 && \
-    appium --log /tmp/appium.log & \
+    appium & \
     appium_pid=\$! && \
-    echo '✅ Appium iniciado. Executando testes...' && \
     sleep 10 && \
-    source venv/bin/activate && \
+    source ./venv/bin/activate && \
     robot --outputdir test_results test_cases && \
     kill \$appium_pid \$emulator_pid"

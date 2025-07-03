@@ -21,7 +21,7 @@ jobs:
 
       - name: ▶️ Executar testes no container
         run: |
-          docker run --name emulador-testes robot-tests
+          docker run -p 4723:4723 --name emulador-testes robot-tests
 
       - name: 📁 Copiar resultados do container
         if: always()
@@ -29,8 +29,8 @@ jobs:
           docker cp emulador-testes:/app/test_results ./results
 
       - name: 📤 Upload dos relatórios do Robot Framework
-        uses: actions/upload-artifact@v4
         if: always()
+        uses: actions/upload-artifact@v4
         with:
           name: resultados-robot
           path: |
