@@ -23,26 +23,26 @@ RUN mkdir -p ${ANDROID_HOME}/cmdline-tools && \
 # Verifica sdkmanager
 RUN ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --sdk_root="${ANDROID_HOME}" --version
 
-# Instala SDKs necessários
+# Instala SDKs necessários (com imagem ARM, que roda sem aceleração de hardware)
 RUN yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --sdk_root="${ANDROID_HOME}" --licenses && \
     ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --sdk_root="${ANDROID_HOME}" \
         "platform-tools" \
         "platforms;android-30" \
-        "system-images;android-30;google_apis;x86_64" \
+        "system-images;android-30;google_apis;armeabi-v7a" \
         "emulator"
 
-# Cria o AVD com imagem x86_64 (pixel_4)
+# Cria o AVD com imagem ARM
 RUN echo "no" | ${ANDROID_HOME}/cmdline-tools/latest/bin/avdmanager \
-    create avd -n testEmulator -k "system-images;android-30;google_apis;x86_64" \
+    create avd -n testEmulator -k "system-images;android-30;google_apis;armeabi-v7a" \
     --device "pixel_4" --force
 
-# Instala Appium globalmente
+# Instala Appium
 RUN npm install -g appium
 
 # Define diretório de trabalho
 WORKDIR /app
 
-# Copia arquivos do projeto
+# Copia os arquivos do projeto
 COPY . .
 
 # Cria ambiente virtual e instala dependências Python
@@ -52,9 +52,11 @@ RUN python3 -m venv venv && \
 
 # Comando de execução
 CMD ["/bin/bash", "-c", "\
-    ${ANDROID_HOME}/emulator/emulator -avd testEmulator -no-audio -no-window & \
+    ${ANDROID_HOME}/emulator/emulator -avd testEmulator -no-audio -no-window -no-boot-anim -accel off & \
     emulator_pid=$! && \
-    sleep 60 && \
+    echo 'Aguardando emulador iniciar...' && \
+    ${ANDROID_HOME}/platform-tools/adb wait-for-device && \
+    sleep 20 && \
     appium & \
     appium_pid=$! && \
     sleep 10 && \
