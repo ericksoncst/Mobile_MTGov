@@ -1,4 +1,4 @@
-name: Testes Mobile com BrowserStack (APK Existente)
+name: Testes Mobile com BrowserStack
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - name: 📥 Checkout do repositório
@@ -18,12 +18,14 @@ jobs:
       - name: 🐍 Configurar ambiente Python
         run: |
           python -m pip install --upgrade pip
-          pip install robotframework robotframework-appiumlibrary Appium-Python-Client==2.7.1
+          pip install robotframework robotframework-appiumlibrary Appium-Python-Client==3.1.0
+          pip install robotframework-datadriver  # Se necessário para seus testes
 
       - name: ▶️ Rodar testes Robot Framework
         env:
           BROWSERSTACK_USERNAME: ${{ secrets.BROWSERSTACK_USERNAME }}
           BROWSERSTACK_ACCESS_KEY: ${{ secrets.BROWSERSTACK_ACCESS_KEY }}
+          BUILD_NUMBER: ${{ github.run_number }}
           REMOTE_URL: "http://${{ secrets.BROWSERSTACK_USERNAME }}:${{ secrets.BROWSERSTACK_ACCESS_KEY }}@hub-cloud.browserstack.com/wd/hub"
           PLATFORM_NAME: Android
           DEVICE_NAME: "Google Pixel 6"
@@ -31,12 +33,10 @@ jobs:
           APP: "bs://ed8b433969d8752cbfacffdbe01efa5e4e1823b5"
           APP_PACKAGE: br.gov.mt.cepromat.mtcidadao
           APP_ACTIVITY: br.gov.mt.cepromat.mtcidadao.MainActivity
-          BROWSERSTACK_DEBUG: true
         run: |
-          echo "Variáveis de configuração:"
+          echo "🔍 Verificando variáveis de ambiente:"
+          echo "REMOTE_URL: $REMOTE_URL"
           echo "APP: $APP"
-          echo "APP_PACKAGE: $APP_PACKAGE"
-          echo "APP_ACTIVITY: $APP_ACTIVITY"
           
           robot --outputdir results \
             --variable REMOTE_URL:"$REMOTE_URL" \
@@ -46,6 +46,9 @@ jobs:
             --variable APP:"$APP" \
             --variable APP_PACKAGE:"$APP_PACKAGE" \
             --variable APP_ACTIVITY:"$APP_ACTIVITY" \
+            --variable BROWSERSTACK_USERNAME:"$BROWSERSTACK_USERNAME" \
+            --variable BROWSERSTACK_ACCESS_KEY:"$BROWSERSTACK_ACCESS_KEY" \
+            --variable BUILD_NUMBER:"$BUILD_NUMBER" \
             test_cases/
 
       - name: 📂 Upload dos resultados

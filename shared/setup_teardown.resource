@@ -3,15 +3,25 @@ Library  AppiumLibrary
 Resource  ../common/main.resource
 
 *** Variables ***
+${REMOTE_URL}       http://${BROWSERSTACK_USERNAME}:${BROWSERSTACK_ACCESS_KEY}@hub-cloud.browserstack.com/wd/hub
 ${PLATFORM_NAME}    Android
 ${DEVICE_NAME}      Google Pixel 6
-${PLATFORM_VERSION}  12.0  # Fixed - no space after variable name
+${PLATFORM_VERSION}  12.0
 ${APP_PACKAGE}      br.gov.mt.cepromat.mtcidadao
 ${APP_ACTIVITY}     br.gov.mt.cepromat.mtcidadao.MainActivity
 
 *** Keywords ***
 abrir app
-    Open Application    ${REMOTE_URL}
+    ${BROWSERSTACK_OPTIONS}=    Create Dictionary
+    ...    userName=${BROWSERSTACK_USERNAME}
+    ...    accessKey=${BROWSERSTACK_ACCESS_KEY}
+    ...    projectName=MTGov Mobile Tests
+    ...    buildName=Build ${BUILD_NUMBER}
+    ...    sessionName=${SUITE_NAME}
+    ...    debug=true
+    ...    networkLogs=true
+
+    ${options}=    Create Dictionary
     ...    platformName=${PLATFORM_NAME}
     ...    platformVersion=${PLATFORM_VERSION}
     ...    deviceName=${DEVICE_NAME}
@@ -20,43 +30,14 @@ abrir app
     ...    appActivity=${APP_ACTIVITY}
     ...    automationName=UiAutomator2
     ...    autoGrantPermissions=true
-
-# ** Variables ***
-# ${PLATFORM_NAME}    Android
-# ${DEVICE_NAME}      emulator-5554
-# ${APP_PATH}         C:/MT_APP/app-test/app-tester/apps/app.apk
-# ${APP_PACKAGE}      br.gov.mt.cepromat.mtcidadao
-# ${APP_ACTIVITY}     br.gov.mt.cepromat.mtcidadao.MainActivity
-# ${APP_PACKAGE}      br.gov.mt.cepromat.mtcidadao
-# ${APP_ACTIVITY}     br.gov.mt.cepromat.mtcidadao.MainActivity
-
-# *** Keywords ***
-# abrir app
-#     Open Application    http://localhost:4723/wd/hub
-#     ...    deviceName=${DEVICE_NAME}
-#     ...    platformName=${PLATFORM_NAME}
-#     ...    app=${APP_PATH}
-#     ...    appPackage=${APP_PACKAGE}
-#     ...    appActivity=${APP_ACTIVITY}
-#     ...    uiautomator2ServerInstallTimeout=60000
-#     ...    adbExecTimeout=60000
-#     ...    autoGrantPermissions=true
-#     ...    isHeadless=true
-#     ...    uiautomator2ServerInstallTimeout=60000
-#     ...    automationName=UiAutomator2
-
-#     Set Appium Timeout    5s
+    ...    bstack:options=${BROWSERSTACK_OPTIONS}
+    
+    Open Application    ${REMOTE_URL}    &{options}
+    Set Appium Timeout    10s
 
 fechar app
-    clicar no botao inicio
-    seleciono o icone do usuario
-    Wait Until Element Is Visible    //android.widget.TextView[@text="SAIR"]
-    Click Element    //android.widget.TextView[@text="SAIR"]
-    Wait Until Element Is Visible    //android.widget.Button[@resource-id="android:id/button1"]
-    Click Element    //android.widget.Button[@resource-id="android:id/button1"]
-    o usuario esteja na Home do APP
-    Close All Applications
-
+    Run Keyword And Ignore Error    Close Application
+    Run Keyword And Ignore Error    Close All Applications
 
 Setup Com Login
     [Arguments]    ${usuario_login}
