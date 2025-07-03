@@ -47,43 +47,42 @@ jobs:
         run: |
           nohup appium -p 4723 -pa /wd/hub > appium.log 2>&1 &
 
-      - name: Run Emulator and Execute Robot Tests
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 30
-          target: google_apis
-          arch: x86_64
-          profile: pixel_4
-          disable-animations: false
-          script: |
-            echo "Waiting for emulator to boot..."
-            adb wait-for-device
+      - name: Start Emulator in Background
+        run: |
+          echo "Starting emulator..."
+          $ANDROID_SDK_ROOT/emulator/emulator -avd test -no-audio -no-boot-anim -gpu swiftshader_indirect -no-window &
+          EMULATOR_PID=$!
+          echo "Waiting for emulator to be ready..."
+          adb wait-for-device
 
-            until adb shell getprop sys.boot_completed | grep -m 1 "1"; do
-              echo "Still waiting for boot..."
-              sleep 5
-            done
+          # Wait for boot completion
+          until adb shell getprop sys.boot_completed | grep -m 1 "1"; do
+            echo "Still waiting for boot..."
+            sleep 5
+          done
 
-            echo "Extra delay to allow system services to stabilize..."
-            sleep 15
+          echo "Giving system time to stabilize..."
+          sleep 15
 
-            echo "Waiting for Android system to be fully operational..."
-            until adb shell dumpsys activity activities | grep -m 1 "ResumedActivity"; do
-              echo "Still waiting for system readiness..."
-              sleep 5
-            done
+          # Wait for activity manager to be resumed
+          until adb shell dumpsys activity activities | grep -m 1 "ResumedActivity"; do
+            echo "Waiting for system readiness..."
+            sleep 5
+          done
 
-            echo "Unlocking device..."
-            adb shell input keyevent 82 || true
+          echo "Unlocking device..."
+          adb shell input keyevent 82 || true
 
-            echo "Installing APK..."
-            adb install -r ./apps/app.apk
+      - name: Install APK and Run Tests
+        run: |
+          echo "Installing APK..."
+          adb install -r ./apps/app.apk
 
-            echo "Running Robot Framework tests..."
-            robot -d reports \
-              -v REMOTE_URL:http://localhost:4723/wd/hub \
-              -v DEVICE_NAME:emulator-5554 \
-              test_cases/
+          echo "Running Robot Framework tests..."
+          robot -d reports \
+            -v REMOTE_URL:http://localhost:4723/wd/hub \
+            -v DEVICE_NAME:emulator-5554 \
+            test_cases/
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
