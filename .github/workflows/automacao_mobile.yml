@@ -16,7 +16,6 @@ jobs:
         ports:
           - 4723:4723
         options: >-
-          --health-cmd "curl --fail http://127.0 0.1:4723/wd/hub/status || exit 1"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -39,4 +38,4 @@ jobs:
         env:
           APPIUM_REMOTE_URL: http://127.0 0.1:4723/wd/hub
         run: |
-          robot -v REMOTE_URL:$APPIUM_REMOTE_URL tests/
+          robot -v REMOTE_URL:http://appium:4723/wd/hub tests/
