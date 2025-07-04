@@ -1,22 +1,60 @@
-name: Basic Android Tests
+name: Android Emulator Tests with Robot Framework
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
 
 jobs:
-  test:
+  robot-tests:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    
+    timeout-minutes: 60
+
     steps:
-      - uses: actions/checkout@v4
+      - name: 🏗️ Setup Environment
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20.x'
       
-      - name: Build and run
-        run: |
-          docker build -t android-tests .
-          docker run -v $(pwd)/results:/app/results android-tests
+      - name: 🧾 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🐳 Build Docker Image
+        run: docker build -t robot-tests .
           
-      - name: Upload results
+      - name: 🚀 Run Tests
+        run: |
+          mkdir -p ./results
+          # Run container in foreground to automatically wait for completion
+          docker run \
+            --name emulador-testes \
+            -p 4723:4723 \
+            -p 5554:5554 \
+            -p 5555:5555 \
+            -e TZ=UTC \
+            -v $PWD/results:/app/test_results \
+            --device /dev/kvm \
+            --cap-add=NET_ADMIN \
+            --shm-size=2g \
+            robot-tests || true
+          
+          # Capture logs if container exists
+          docker logs emulador-testes > container.log 2>&1 || true
+
+      - name: 📦 Upload Results
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: results
-          path: results
+          name: test-results
+          path: |
+            results/output.xml
+            results/report.html
+            results/log.html
+            results/*.png
+            container.log
+
+      - name: 🧹 Cleanup
+        if: always()
+        run: |
+          docker rm -f emulador-testes 2>/dev/null || true
