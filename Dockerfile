@@ -96,23 +96,48 @@ RUN python3 -m venv venv && \
 
 # Execution command
 CMD ["/bin/bash", "-c", "\
-    echo 'Starting emulator...' && \
-    ${ANDROID_HOME}/emulator/emulator -avd testEmulator -no-audio -no-window -no-boot-anim -no-snapshot -accel off -ports 5554,5555 & \
+    # Start emulator with explicit ports
+    ${ANDROID_HOME}/emulator/emulator -avd testEmulator -no-audio -no-window -no-boot-anim -no-snapshot -ports 5554,5555 & \
     emulator_pid=$! && \
     
+    # Wait for emulator (with enhanced checks)
     /wait_for_emulator.sh && \
     
-    echo 'Starting Appium...' && \
-    appium --relaxed-security --allow-insecure=adb_shell --base-path /wd/hub --address 0.0.0.0 --port 4723 & \
+    # Start Appium with proper config
+    echo 'Starting Appium with debug...' && \
+    appium \
+      --relaxed-security \
+      --allow-insecure=adb_shell \
+      --base-path /wd/hub \
+      --address 0.0.0.0 \
+      --port 4723 \
+      --log-timestamp \
+      --local-timezone \
+      --log-level debug &> /app/appium.log & \
     appium_pid=$! && \
-    sleep 15 && \
     
-    echo 'Checking Appium status...' && \
-    curl --retry 10 --retry-delay 5 --retry-connrefused http://localhost:4723/wd/hub/status || (echo 'Appium failed to start' && exit 1) && \
+    # Wait for Appium (with backoff retries)
+    echo 'Waiting for Appium...' && \
+    for i in {1..10}; do \
+      if curl -s http://localhost:4723/wd/hub/status >/dev/null; then \
+        echo 'Appium ready!' && \
+        break; \
+      fi; \
+      echo "Attempt $i: Appium not ready yet..."; \
+      sleep 5; \
+      if [ $i -eq 10 ]; then \
+        echo 'Appium failed to start!'; \
+        echo 'Last 50 lines of Appium log:'; \
+        tail -n 50 /app/appium.log; \
+        exit 1; \
+      fi; \
+    done && \
     
+    # Run tests
     echo 'Running tests...' && \
     source ./venv/bin/activate && \
     robot --outputdir test_results /app/test_cases || true && \
     
-    echo 'Cleaning up...' && \
-    kill $appium_pid $emulator_pid"]
+    # Cleanup
+    echo 'Test completed with status $?' && \
+    kill -9 $appium_pid $emulator_pid 2>/dev/null || true"]
