@@ -66,10 +66,10 @@ jobs:
               sleep 5; \
             done'
 
-          timeout 2m bash -c '\
-            until docker exec test-container curl -s http://127.0.0.1:4723/wd/hub/status | grep -q "Appium server ready"; do \
-              echo "Waiting for Appium (HTTP check)..."; \
-              sleep 5; \
+          timeout 2m bash -c '
+            until docker exec test-container curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:4723/wd/hub/status | grep -q "200"; do
+              echo "Waiting for Appium (HTTP 200)..."
+              sleep 5
             done'
 
           echo "✅ All services ready!"
