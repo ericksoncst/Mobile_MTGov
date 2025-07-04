@@ -1,16 +1,16 @@
 # Base image
 FROM ubuntu:22.04
 
-# Environment configuration
-ENV DEBIAN_FRONTEND=noninteractive \
-    TZ=UTC \
-    ANDROID_HOME=/opt/android-sdk \
-    JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 \
-    PATH="$JAVA_HOME/bin:$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator" \
-    NODE_VERSION=20.x \
-    APPIUM_VERSION=2.13.0 \
-    EMULATOR_NAME=testEmulator \
-    EMULATOR_PORT=5554
+# Environment configuration (using proper ENV format)
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
+ENV ANDROID_HOME=/opt/android-sdk
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+ENV PATH="${JAVA_HOME}/bin:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${ANDROID_HOME}/emulator:$PATH"
+ENV NODE_VERSION=20.x
+ENV APPIUM_VERSION=2.13.0
+ENV EMULATOR_NAME=testEmulator
+ENV EMULATOR_PORT=5554
 
 # Install system dependencies
 RUN apt-get update && \
@@ -40,7 +40,7 @@ RUN apt-get update && \
     localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8
 
 # Configure locale
-ENV LANG en_US.utf8
+ENV LANG=en_US.utf8
 
 # Install Node.js
 RUN curl -sL https://deb.nodesource.com/setup_${NODE_VERSION} | bash - && \
@@ -109,7 +109,7 @@ RUN python3 -m venv venv && \
 HEALTHCHECK --interval=30s --timeout=30s --start-period=30s --retries=3 \
     CMD adb shell pm list packages >/dev/null || exit 1
 
-# Main entrypoint
+# Main entrypoint (using JSON array format)
 CMD ["/bin/bash", "-c", "\
     set -e\n\
     echo '=== Starting Test Environment ==='\n\
