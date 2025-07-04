@@ -29,6 +29,7 @@ RUN apt-get update && \
         qemu-kvm \
         tzdata \
         file \
+        netcat \
         && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
@@ -72,39 +73,89 @@ RUN npm install -g appium@2.13.0 && \
     npm install -g appium-doctor && \
     appium driver install uiautomator2
 
-# Optimized wait script (3-minute timeout)
+# Enhanced wait script with daemon verification
 RUN echo '#!/bin/bash\n\
 set -e\n\
+\n\
+# Start emulator\n\
+echo "🚀 Starting emulator..."\n\
+${ANDROID_HOME}/emulator/emulator -avd testEmulator \\
+  -no-audio \
+  -no-window \
+  -no-snapshot \
+  -memory 2048 \
+  -gpu swiftshader_indirect \
+  -ports 5554,5555 &> /app/emulator.log &\n\
+emulator_pid=$!\n\
+\n\
+# Phase 1: ADB connection (3 min timeout)\n\
+echo "⏳ Waiting for ADB connection (max 3m)..."\n\
 timeout 180 bash -c '\''\n\
-  echo "⏳ Waiting for ADB (max 3m)..."\n\
-  until adb devices | grep -q "emulator"; do sleep 5; done\n\
-  \n\
-  echo "⚙️ Checking boot status..."\n\
+  until adb devices | grep -q "emulator"; do\n\
+    sleep 5\n\
+  done\n\
+'\'' || {\n\
+  echo "❌ ADB connection failed";\n\
+  echo "=== Emulator Log ===";\n\
+  tail -n 50 /app/emulator.log;\n\
+  exit 1;\n\
+}\n\
+\n\
+# Phase 2: System boot (3 min timeout)\n\
+echo "⚙️ Waiting for system boot (max 3m)..."\n\
+timeout 180 bash -c '\''\n\
   until adb shell getprop sys.boot_completed | grep -q "1"; do\n\
     adb shell input keyevent 82\n\
     sleep 10\n\
   done\n\
-  \n\
-  echo "🔍 Verifying system stability..."\n\
-  adb shell pm list packages >/dev/null\n\
-'\''\n\
+'\'' || {\n\
+  echo "❌ System boot failed";\n\
+  echo "=== System Properties ===";\n\
+  adb shell getprop | grep -E "boot|init|sys";\n\
+  exit 1;\n\
+}\n\
 \n\
-if [ $? -eq 0 ]; then\n\
-  echo "✅ Emulator ready in $(($SECONDS/60))m$(($SECONDS%60))s"\n\
-else\n\
-  echo "❌ Boot failed"\n\
-  echo "=== Device Info ==="\n\
-  adb devices -l\n\
-  echo "=== System Props ==="\n\
-  adb shell getprop | grep -E "boot|sys"\n\
-  exit 1\n\
-fi' > /wait_for_emulator.sh && \
+# Phase 3: Service stability (1 min timeout)\n\
+echo "🔍 Verifying services (max 1m)..."\n\
+timeout 60 bash -c '\''\n\
+  until adb shell pm list packages >/dev/null; do\n\
+    sleep 5\n\
+  done\n\
+'\'' || {\n\
+  echo "❌ Core services not responding";\n\
+  exit 1;\n\
+}\n\
+\n\
+echo "✅ Emulator ready in $(($SECONDS/60))m$(($SECONDS%60))s"' > /wait_for_emulator.sh && \
 chmod +x /wait_for_emulator.sh
 
-# Copy APK with validation
+# Appium health check script
+RUN echo '#!/bin/bash\n\
+set -e\n\
+\n\
+echo "⏳ Waiting for Appium server (max 2m)..."\n\
+timeout 120 bash -c '\''\n\
+  until nc -z localhost 4723 && \\\n\
+    curl -s http://localhost:4723/wd/hub/status | grep -q "status.*0"; do\n\
+    sleep 5\n\
+  done\n\
+'\'' || {\n\
+  echo "❌ Appium failed to start";\n\
+  echo "=== Appium Log ===";\n\
+  tail -n 50 /app/appium.log;\n\
+  exit 1;\n\
+}\n\
+\n\
+echo "✅ Appium ready"' > /wait_for_appium.sh && \
+chmod +x /wait_for_appium.sh
+
+# Copy project files
 WORKDIR /app
-COPY ./apps/app.apk /app/apps/app.apk
-RUN if [ ! -f /app/apps/app.apk ]; then \
+COPY . .
+
+# Verify and install APK
+RUN mkdir -p /app/apps && \
+    if [ ! -f /app/apps/app.apk ]; then \
       echo "❌ APK not found at /app/apps/app.apk"; \
       exit 1; \
     fi && \
@@ -116,64 +167,41 @@ RUN if [ ! -f /app/apps/app.apk ]; then \
 
 # Python environment
 RUN python3 -m venv /app/venv && \
-    # Activate venv and use full paths
     . /app/venv/bin/activate && \
     pip install --upgrade pip && \
-    # Only install requirements if file exists
     if [ -f /app/requirements.txt ]; then \
-        pip install -r /app/requirements.txt; \
+      pip install -r /app/requirements.txt; \
     else \
-        echo "⚠️ requirements.txt not found, skipping"; \
+      echo "⚠️ requirements.txt not found, skipping"; \
     fi
 
-# Startup command
-# Replace the CMD with this more robust version:
+# Main entrypoint
 CMD ["/bin/bash", "-c", "\
-    # Start emulator with logging
-    echo 'Starting emulator...' && \
-    ${ANDROID_HOME}/emulator/emulator -avd testEmulator \
-      -no-audio \
-      -no-window \
-      -no-snapshot \
-      -memory 2048 \
-      -gpu swiftshader_indirect \
-      -ports 5554,5555 &> /app/emulator.log & \
-    emulator_pid=$! && \
-    \
-    # Keep container alive if emulator fails
-    tail -f /dev/null & \
-    tail_pid=$! && \
-    \
-    # Wait for emulator
+    # Start emulator
     /wait_for_emulator.sh && \
-    \
-    # Install APK (non-blocking)
-    echo 'Installing APK...' && \
+    \n\
+    # Install APK\n\
+    echo \"💿 Installing APK...\" && \
     adb install -t -g /app/apps/app.apk &> /app/install.log || \
-      echo '⚠️ APK install failed (continuing)' && \
-    \
-    # Start Appium
-    echo 'Starting Appium...' && \
+      echo \"⚠️ APK install failed (continuing)\" && \
+    \n\
+    # Start Appium\n\
+    echo \"🌐 Starting Appium...\" && \
     appium \
       --relaxed-security \
       --allow-insecure=apk_check \
       --base-path /wd/hub \
       --address 0.0.0.0 \
       --port 4723 &> /app/appium.log & \
-    appium_pid=$! && \
-    \
-    # Wait for Appium
-    timeout 60 bash -c '\
-      until curl -s http://localhost:4723/wd/hub/status | grep -q \"status\":0; do \
-        sleep 5; \
-      done' || echo '⚠️ Appium health check failed' && \
-    \
-    # Run tests
-    echo 'Running tests...' && \
+    \n\
+    # Verify Appium\n\
+    /wait_for_appium.sh && \
+    \n\
+    # Run tests\n\
+    echo \"🔍 Running tests...\" && \
     source ./venv/bin/activate && \
     robot --outputdir test_results /app/test_cases; \
     test_exit=$? && \
-    \
-    # Cleanup
-    kill -9 $appium_pid $emulator_pid $tail_pid 2>/dev/null || true && \
-    exit $test_exit"]
+    \n\
+    # Preserve exit code while keeping container alive for debugging\n\
+    tail -f /dev/null"]

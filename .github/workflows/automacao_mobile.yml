@@ -46,6 +46,10 @@ jobs:
             --shm-size=2g \
             -d \
             android-tests
+          
+          # Wait for container to stabilize
+          sleep 15
+          docker ps | grep test-container || { echo "❌ Container failed to start"; exit 1; }
 
       - name: ⏱️ Verify Services
         timeout-minutes: 5
