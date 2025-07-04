@@ -115,9 +115,16 @@ RUN if [ ! -f /app/apps/app.apk ]; then \
     }; }
 
 # Python environment
-RUN python3 -m venv venv && \
-    ./venv/bin/pip install --upgrade pip && \
-    ./venv/bin/pip install -r requirements.txt
+RUN python3 -m venv /app/venv && \
+    # Activate venv and use full paths
+    . /app/venv/bin/activate && \
+    pip install --upgrade pip && \
+    # Only install requirements if file exists
+    if [ -f /app/requirements.txt ]; then \
+        pip install -r /app/requirements.txt; \
+    else \
+        echo "⚠️ requirements.txt not found, skipping"; \
+    fi
 
 # Startup command
 # Replace the CMD with this more robust version:
