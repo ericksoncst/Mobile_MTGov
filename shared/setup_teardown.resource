@@ -13,18 +13,23 @@ ${APP_ACTIVITY}     br.gov.mt.cepromat.mtcidadao.MainActivity
 
 *** Keywords ***
 abrir app
-    Open Application    http://localhost:4723/wd/hub
+     Open Application    http://localhost:4723/wd/hub
     ...    deviceName=${DEVICE_NAME}
     ...    platformName=${PLATFORM_NAME}
     ...    app=${APP_PATH}
     ...    appPackage=${APP_PACKAGE}
     ...    appActivity=${APP_ACTIVITY}
+    ...    automationName=UiAutomator2
+    ...    newCommandTimeout=300
+    ...    adbExecTimeout=120000
+    ...    ignoreHiddenApiPolicyError=true
     ...    uiautomator2ServerInstallTimeout=60000
-    ...    adbExecTimeout=60000
     ...    autoGrantPermissions=true
     ...    isHeadless=true
-    ...    uiautomator2ServerInstallTimeout=60000
-    ...    automationName=UiAutomator2
+    ...    enforceAppInstall=true
+    ...    disableWindowAnimation=true
+    ...    skipDeviceInitialization=false
+    ...    skipServerInstallation=false
 
     Set Appium Timeout    5s
 

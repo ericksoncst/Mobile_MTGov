@@ -24,7 +24,10 @@ jobs:
           docker run \
             --name emulador-testes \
             -p 4723:4723 \
+            -e TZ=UTC \
             -v $PWD/results:/app/test_results \
+            --device /dev/kvm \
+            --cap-add=NET_ADMIN \
             robot-tests
 
       - name: 📤 Upload Robot Framework reports

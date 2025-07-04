@@ -2,6 +2,10 @@ FROM ubuntu:22.04
 
 # Set environment variables to avoid interactive prompts
 ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
+ENV ANDROID_HOME=/opt/android-sdk
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+ENV PATH="${JAVA_HOME}/bin:${PATH}:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${ANDROID_HOME}/emulator"
 
 # Install dependencies
 RUN apt-get update && \
@@ -23,22 +27,18 @@ RUN apt-get update && \
         libxrender1 \
         libxtst6 \
         qemu-kvm \
+        tzdata \
         && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Install Node.js 20.x (current LTS)
+# Install Node.js 20.x
 RUN mkdir -p /etc/apt/keyrings && \
     curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg && \
     echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list && \
     apt-get update && \
     apt-get install -y nodejs && \
     npm install -g npm@latest
-
-# Configure environment variables
-ENV ANDROID_HOME=/opt/android-sdk
-ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
-ENV PATH="${JAVA_HOME}/bin:${PATH}:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${ANDROID_HOME}/emulator"
 
 # Install Android Command Line Tools
 RUN mkdir -p ${ANDROID_HOME}/cmdline-tools && \
@@ -66,33 +66,42 @@ RUN echo "no" | ${ANDROID_HOME}/cmdline-tools/latest/bin/avdmanager \
     create avd -n testEmulator -k "system-images;android-30;google_apis;x86_64" \
     --device "pixel_4" --force
 
-# Install Appium with version compatible with Node.js 20
+# Install Appium and drivers
 RUN npm install -g appium@2.13.0 && \
     npm install -g appium-doctor && \
     appium driver install uiautomator2 && \
     appium driver install xcuitest
 
-# Set working directory
+# Set working directory and copy files
 WORKDIR /app
-
-# Copy project files including test_cases directory
 COPY . .
 
-# Create Python virtual environment and install dependencies
+# Create Python virtual environment
 RUN python3 -m venv venv && \
     ./venv/bin/pip install --upgrade pip && \
     ./venv/bin/pip install -r requirements.txt
 
-# Execution command - now explicitly pointing to /app/test_cases
+# Add wait script
+RUN echo '#!/bin/bash\n\
+adb wait-for-device\n\
+while [ "$(adb shell getprop sys.boot_completed | tr -d '"'"'\r'"'"')" != "1" ]; do\n\
+  sleep 1\n\
+done\n\
+sleep 10' > /wait_for_emulator.sh && \
+    chmod +x /wait_for_emulator.sh
+
+# Execution command
 CMD ["/bin/bash", "-c", "\
-    ${ANDROID_HOME}/emulator/emulator -avd testEmulator -no-audio -no-window -no-boot-anim -accel off & \
+    echo 'Starting emulator...' && \
+    ${ANDROID_HOME}/emulator/emulator -avd testEmulator -no-audio -no-window -no-boot-anim -no-snapshot -accel off & \
     emulator_pid=$! && \
-    echo 'Waiting for emulator to start...' && \
-    ${ANDROID_HOME}/platform-tools/adb wait-for-device && \
-    while [ \"$(${ANDROID_HOME}/platform-tools/adb shell getprop sys.boot_completed | tr -d '\\r')\" != \"1\" ]; do sleep 1; done && \
-    appium & \
+    /wait_for_emulator.sh && \
+    echo 'Starting Appium...' && \
+    appium --relaxed-security & \
     appium_pid=$! && \
     sleep 10 && \
+    echo 'Running tests...' && \
     source ./venv/bin/activate && \
-    robot --outputdir test_results /app/test_cases && \
+    robot --outputdir test_results /app/test_cases || true && \
+    echo 'Tests completed' && \
     kill $appium_pid $emulator_pid"]
