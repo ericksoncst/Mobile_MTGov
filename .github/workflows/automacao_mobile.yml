@@ -58,7 +58,7 @@ jobs:
               \
               # Start Appium and track PID
               appium --relaxed-security --base-path /wd/hub --address 127.0.0.1 --port 4723 &
-
+              echo \$! > /appium.pid && \
               \
               # Verify Appium readiness
               until curl -s http://localhost:4723/wd/hub/status >/dev/null; do sleep 5; done && \
