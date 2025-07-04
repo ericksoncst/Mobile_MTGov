@@ -102,15 +102,12 @@ fi' > /wait_for_emulator.sh && \
 chmod +x /wait_for_emulator.sh
 
 # Copy APK with validation
-# Replace the APK validation section with:
 WORKDIR /app
-COPY . .
-RUN mkdir -p /app/apps && \
-    if [ ! -f ./apps/app.apk ]; then \
-      echo "❌ APK not found in ./apps/app.apk"; \
+COPY ./apps/app.apk /app/apps/app.apk
+RUN if [ ! -f /app/apps/app.apk ]; then \
+      echo "❌ APK not found at /app/apps/app.apk"; \
       exit 1; \
     fi && \
-    mv ./apps/app.apk /app/apps/ && \
     echo "✅ APK found (size: $(du -h /app/apps/app.apk | cut -f1))" && \
     { unzip -t /app/apps/app.apk >/dev/null 2>&1 || { \
       echo "⚠️ APK validation warning (continuing anyway)"; \
