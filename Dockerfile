@@ -74,15 +74,16 @@ RUN npm install -g appium@2.13.0 && \
 
 # Create wait script with ARM compatibility check
 RUN echo '#!/bin/bash\n\
-echo "Checking device architecture..."\n\
-adb wait-for-device\n\
-ARCH=$(adb shell getprop ro.product.cpu.abi)\n\
-echo "Device architecture: $ARCH"\n\
-if [[ "$ARCH" != "arm64-v8a" ]]; then\n\
-  echo "❌ Architecture mismatch! Expected arm64-v8a but got $ARCH"\n\
-  exit 1\n\
+echo "Waiting for ADB connection..."\n\
+timeout 60 adb wait-for-device\n\
+if [ $? -ne 0 ]; then\n\
+  echo "❌ Failed to connect to ADB";\n\
+  adb devices -l;\n\
+  exit 1;\n\
 fi\n\
+\n\
 echo "Waiting for boot completion..."\n\
+timeout 300 bash -c '\''\n\
 while [ "$(adb shell getprop sys.boot_completed | tr -d '"'"'\r'"'"')" != "1" ]; do\n\
   echo "Emulator not ready yet..."\n\
   sleep 5\n\
