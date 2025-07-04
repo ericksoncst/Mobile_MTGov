@@ -73,12 +73,11 @@ RUN npm install -g appium@2.13.0 && \
     npm install -g appium-doctor && \
     appium driver install uiautomator2
 
-# Enhanced wait script with daemon verification
-# Create wait_for_emulator.sh with proper escaping
-RUN echo '#!/bin/bash
+# Create wait_for_emulator.sh
+RUN cat <<'EOF' > /wait_for_emulator.sh
+#!/bin/bash
 set -e
 
-# Start emulator
 echo "🚀 Starting emulator..."
 ${ANDROID_HOME}/emulator/emulator -avd testEmulator \
   -no-audio \
@@ -89,66 +88,45 @@ ${ANDROID_HOME}/emulator/emulator -avd testEmulator \
   -ports 5554,5555 &> /app/emulator.log &
 emulator_pid=$!
 
-# Phase 1: ADB connection (3 min timeout)
 echo "⏳ Waiting for ADB connection (max 3m)..."
-timeout 180 bash -c '\''
+timeout 180 bash -c '
   until adb devices | grep -q "emulator"; do
     sleep 5
   done
-'\'' || {
+' || {
   echo "❌ ADB connection failed"
   echo "=== Emulator Log ==="
   tail -n 50 /app/emulator.log
   exit 1
 }
 
-# Phase 2: System boot (3 min timeout)
 echo "⚙️ Waiting for system boot (max 3m)..."
-timeout 180 bash -c '\''
+timeout 180 bash -c '
   until adb shell getprop sys.boot_completed | grep -q "1"; do
     adb shell input keyevent 82
     sleep 10
   done
-'\'' || {
+' || {
   echo "❌ System boot failed"
   echo "=== System Properties ==="
   adb shell getprop | grep -E "boot|init|sys"
   exit 1
 }
 
-# Phase 3: Service stability (1 min timeout)
 echo "🔍 Verifying services (max 1m)..."
-timeout 60 bash -c '\''
+timeout 60 bash -c '
   until adb shell pm list packages >/dev/null; do
     sleep 5
   done
-'\'' || {
+' || {
   echo "❌ Core services not responding"
   exit 1
 }
 
-echo "✅ Emulator ready in $(($SECONDS/60))m$(($SECONDS%60))s"' > /wait_for_emulator.sh && \
-chmod +x /wait_for_emulator.sh
+echo "✅ Emulator ready in $(($SECONDS/60))m$(($SECONDS%60))s"
+EOF
 
-# Appium health check script
-RUN echo '#!/bin/bash\n\
-set -e\n\
-\n\
-echo "⏳ Waiting for Appium server (max 2m)..."\n\
-timeout 120 bash -c '\''\n\
-  until nc -z localhost 4723 && \\\n\
-    curl -s http://localhost:4723/wd/hub/status | grep -q "status.*0"; do\n\
-    sleep 5\n\
-  done\n\
-'\'' || {\n\
-  echo "❌ Appium failed to start";\n\
-  echo "=== Appium Log ===";\n\
-  tail -n 50 /app/appium.log;\n\
-  exit 1;\n\
-}\n\
-\n\
-echo "✅ Appium ready"' > /wait_for_appium.sh && \
-chmod +x /wait_for_appium.sh
+RUN chmod +x /wait_for_emulator.sh
 
 # Copy project files
 WORKDIR /app
@@ -176,7 +154,7 @@ RUN python3 -m venv /app/venv && \
       echo "⚠️ requirements.txt not found, skipping"; \
     fi
 
-# Main entrypoint
+# Main entrypoint with built-in Appium verification
 CMD ["/bin/bash", "-c", "\
     # Start emulator
     /wait_for_emulator.sh && \
@@ -195,8 +173,19 @@ CMD ["/bin/bash", "-c", "\
       --address 0.0.0.0 \
       --port 4723 &> /app/appium.log & \
     \n\
-    # Verify Appium\n\
-    /wait_for_appium.sh && \
+    # Verify Appium is ready (built-in, no external script needed)\n\
+    echo \"⏳ Waiting for Appium (max 2m)...\" && \
+    timeout 120 bash -c '\''\n\
+      until nc -z localhost 4723 && \\\n\
+        curl -s http://localhost:4723/wd/hub/status | grep -q \"status\":0; do\n\
+        sleep 5\n\
+      done\n\
+    '\'' || {\n\
+      echo \"❌ Appium failed to start\";\n\
+      echo \"=== Appium Log ===\";\n\
+      tail -n 50 /app/appium.log;\n\
+      exit 1;\n\
+    } && \n\
     \n\
     # Run tests\n\
     echo \"🔍 Running tests...\" && \
