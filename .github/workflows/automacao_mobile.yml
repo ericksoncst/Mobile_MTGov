@@ -12,6 +12,36 @@ jobs:
     timeout-minutes: 60
 
     steps:
+
+    # PHASE 0: GIT LFS SETUP
+      - name: 🔍 Setup Git LFS
+        uses: actions/checkout@v4
+        with:
+          lfs: true  # This is crucial
+          submodules: recursive
+
+      - name: 🛠️ Verify LFS Files
+        run: |
+          # Check if file is LFS pointer
+          if file ./apps/app.apk | grep -q "ASCII text"; then
+            echo "❌ Error: APK is an LFS pointer, not pulled properly"
+            git lfs install
+            git lfs pull
+            echo "After pull, file type: $(file ./apps/app.apk)"
+            exit 1
+          fi
+          
+          # Verify actual APK
+          if ! unzip -t ./apps/app.apk >/dev/null 2>&1; then
+            echo "❌ Error: Invalid APK after LFS pull"
+            echo "File info:"
+            file ./apps/app.apk
+            echo "First bytes:"
+            xxd -l 100 ./apps/app.apk
+            exit 1
+          fi
+          echo "✅ APK verified"
+
       # PHASE 1: SETUP
       - name: 🏗️ Setup Node.js
         uses: actions/setup-node@v3
