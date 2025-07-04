@@ -74,58 +74,59 @@ RUN npm install -g appium@2.13.0 && \
     appium driver install uiautomator2
 
 # Enhanced wait script with daemon verification
-RUN echo '#!/bin/bash\n\
-set -e\n\
-\n\
-# Start emulator\n\
-echo "🚀 Starting emulator..."\n\
-${ANDROID_HOME}/emulator/emulator -avd testEmulator \\
+# Create wait_for_emulator.sh with proper escaping
+RUN echo '#!/bin/bash
+set -e
+
+# Start emulator
+echo "🚀 Starting emulator..."
+${ANDROID_HOME}/emulator/emulator -avd testEmulator \
   -no-audio \
   -no-window \
   -no-snapshot \
   -memory 2048 \
   -gpu swiftshader_indirect \
-  -ports 5554,5555 &> /app/emulator.log &\n\
-emulator_pid=$!\n\
-\n\
-# Phase 1: ADB connection (3 min timeout)\n\
-echo "⏳ Waiting for ADB connection (max 3m)..."\n\
-timeout 180 bash -c '\''\n\
-  until adb devices | grep -q "emulator"; do\n\
-    sleep 5\n\
-  done\n\
-'\'' || {\n\
-  echo "❌ ADB connection failed";\n\
-  echo "=== Emulator Log ===";\n\
-  tail -n 50 /app/emulator.log;\n\
-  exit 1;\n\
-}\n\
-\n\
-# Phase 2: System boot (3 min timeout)\n\
-echo "⚙️ Waiting for system boot (max 3m)..."\n\
-timeout 180 bash -c '\''\n\
-  until adb shell getprop sys.boot_completed | grep -q "1"; do\n\
-    adb shell input keyevent 82\n\
-    sleep 10\n\
-  done\n\
-'\'' || {\n\
-  echo "❌ System boot failed";\n\
-  echo "=== System Properties ===";\n\
-  adb shell getprop | grep -E "boot|init|sys";\n\
-  exit 1;\n\
-}\n\
-\n\
-# Phase 3: Service stability (1 min timeout)\n\
-echo "🔍 Verifying services (max 1m)..."\n\
-timeout 60 bash -c '\''\n\
-  until adb shell pm list packages >/dev/null; do\n\
-    sleep 5\n\
-  done\n\
-'\'' || {\n\
-  echo "❌ Core services not responding";\n\
-  exit 1;\n\
-}\n\
-\n\
+  -ports 5554,5555 &> /app/emulator.log &
+emulator_pid=$!
+
+# Phase 1: ADB connection (3 min timeout)
+echo "⏳ Waiting for ADB connection (max 3m)..."
+timeout 180 bash -c '\''
+  until adb devices | grep -q "emulator"; do
+    sleep 5
+  done
+'\'' || {
+  echo "❌ ADB connection failed"
+  echo "=== Emulator Log ==="
+  tail -n 50 /app/emulator.log
+  exit 1
+}
+
+# Phase 2: System boot (3 min timeout)
+echo "⚙️ Waiting for system boot (max 3m)..."
+timeout 180 bash -c '\''
+  until adb shell getprop sys.boot_completed | grep -q "1"; do
+    adb shell input keyevent 82
+    sleep 10
+  done
+'\'' || {
+  echo "❌ System boot failed"
+  echo "=== System Properties ==="
+  adb shell getprop | grep -E "boot|init|sys"
+  exit 1
+}
+
+# Phase 3: Service stability (1 min timeout)
+echo "🔍 Verifying services (max 1m)..."
+timeout 60 bash -c '\''
+  until adb shell pm list packages >/dev/null; do
+    sleep 5
+  done
+'\'' || {
+  echo "❌ Core services not responding"
+  exit 1
+}
+
 echo "✅ Emulator ready in $(($SECONDS/60))m$(($SECONDS%60))s"' > /wait_for_emulator.sh && \
 chmod +x /wait_for_emulator.sh
 
