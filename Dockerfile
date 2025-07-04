@@ -4,8 +4,10 @@ FROM ubuntu:22.04
 ENV DEBIAN_FRONTEND=noninteractive \
     TZ=UTC \
     ANDROID_HOME=/opt/android-sdk \
-    JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 \
-    PATH="${JAVA_HOME}/bin:${PATH}:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${ANDROID_HOME}/emulator"
+    JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+
+# Set PATH in a separate RUN command to ensure variables are available
+RUN echo "PATH=${JAVA_HOME}/bin:${PATH}:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${ANDROID_HOME}/emulator" >> /etc/environment
 
 # Install dependencies
 RUN apt-get update && \
@@ -154,44 +156,5 @@ RUN python3 -m venv /app/venv && \
       echo "⚠️ requirements.txt not found, skipping"; \
     fi
 
-# Main entrypoint with built-in Appium verification
-CMD ["/bin/bash", "-c", "\
-    # Start emulator
-    /wait_for_emulator.sh && \
-    \n\
-    # Install APK\n\
-    echo \"💿 Installing APK...\" && \
-    adb install -t -g /app/apps/app.apk &> /app/install.log || \
-      echo \"⚠️ APK install failed (continuing)\" && \
-    \n\
-    # Start Appium\n\
-    echo \"🌐 Starting Appium...\" && \
-    appium \
-      --relaxed-security \
-      --allow-insecure=apk_check \
-      --base-path /wd/hub \
-      --address 0.0.0.0 \
-      --port 4723 &> /app/appium.log & \
-    \n\
-    # Verify Appium is ready (built-in, no external script needed)\n\
-    echo \"⏳ Waiting for Appium (max 2m)...\" && \
-    timeout 120 bash -c '\''\n\
-      until nc -z localhost 4723 && \\\n\
-        curl -s http://localhost:4723/wd/hub/status | grep -q \"status\":0; do\n\
-        sleep 5\n\
-      done\n\
-    '\'' || {\n\
-      echo \"❌ Appium failed to start\";\n\
-      echo \"=== Appium Log ===\";\n\
-      tail -n 50 /app/appium.log;\n\
-      exit 1;\n\
-    } && \n\
-    \n\
-    # Run tests\n\
-    echo \"🔍 Running tests...\" && \
-    source ./venv/bin/activate && \
-    robot --outputdir test_results /app/test_cases; \
-    test_exit=$? && \
-    \n\
-    # Preserve exit code while keeping container alive for debugging\n\
-    tail -f /dev/null"]
+# Main entrypoint in proper JSON format
+CMD ["/bin/bash", "-c", "exec /app/startup.sh"]
