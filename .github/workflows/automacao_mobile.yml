@@ -24,17 +24,19 @@ jobs:
           docker run \
             --name emulador-testes \
             -p 4723:4723 \
+            -p 5554:5554 \
+            -p 5555:5555 \
             -e TZ=UTC \
             -v $PWD/results:/app/test_results \
             --device /dev/kvm \
             --cap-add=NET_ADMIN \
             robot-tests
 
-      - name: 📤 Upload Robot Framework reports
+      - name: 📤 Upload test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: robot-framework-results
+          name: robot-results
           path: |
             results/output.xml
             results/report.html

@@ -1,11 +1,11 @@
 FROM ubuntu:22.04
 
-# Set environment variables to avoid interactive prompts
-ENV DEBIAN_FRONTEND=noninteractive
-ENV TZ=UTC
-ENV ANDROID_HOME=/opt/android-sdk
-ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
-ENV PATH="${JAVA_HOME}/bin:${PATH}:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${ANDROID_HOME}/emulator"
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive \
+    TZ=UTC \
+    ANDROID_HOME=/opt/android-sdk \
+    JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 \
+    PATH="${JAVA_HOME}/bin:${PATH}:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${ANDROID_HOME}/emulator"
 
 # Install dependencies
 RUN apt-get update && \
@@ -40,7 +40,7 @@ RUN mkdir -p /etc/apt/keyrings && \
     apt-get install -y nodejs && \
     npm install -g npm@latest
 
-# Install Android Command Line Tools
+# Install Android SDK
 RUN mkdir -p ${ANDROID_HOME}/cmdline-tools && \
     cd ${ANDROID_HOME}/cmdline-tools && \
     wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O tools.zip && \
@@ -66,42 +66,53 @@ RUN echo "no" | ${ANDROID_HOME}/cmdline-tools/latest/bin/avdmanager \
     create avd -n testEmulator -k "system-images;android-30;google_apis;x86_64" \
     --device "pixel_4" --force
 
-# Install Appium and drivers
+# Install Appium
 RUN npm install -g appium@2.13.0 && \
     npm install -g appium-doctor && \
-    appium driver install uiautomator2 && \
-    appium driver install xcuitest
+    appium driver install uiautomator2
+
+# Create wait script in root
+RUN echo '#!/bin/bash\n\
+echo "Waiting for ADB..."\n\
+adb wait-for-device\n\
+echo "Waiting for boot completion..."\n\
+while [ "$(adb shell getprop sys.boot_completed | tr -d '"'"'\r'"'"')" != "1" ]; do\n\
+  echo "Emulator not ready yet..."\n\
+  sleep 5\n\
+  adb shell input keyevent 82\n\
+done\n\
+echo "Emulator ready!"\n\
+sleep 15' > /wait_for_emulator.sh && \
+    chmod +x /wait_for_emulator.sh
 
 # Set working directory and copy files
 WORKDIR /app
 COPY . .
 
-# Create Python virtual environment
+# Create Python environment
 RUN python3 -m venv venv && \
     ./venv/bin/pip install --upgrade pip && \
     ./venv/bin/pip install -r requirements.txt
 
-# Add wait script
-RUN echo '#!/bin/bash\n\
-adb wait-for-device\n\
-while [ "$(adb shell getprop sys.boot_completed | tr -d '"'"'\r'"'"')" != "1" ]; do\n\
-  sleep 1\n\
-done\n\
-sleep 10' > /wait_for_emulator.sh && \
-    chmod +x /wait_for_emulator.sh
-
 # Execution command
 CMD ["/bin/bash", "-c", "\
     echo 'Starting emulator...' && \
-    ${ANDROID_HOME}/emulator/emulator -avd testEmulator -no-audio -no-window -no-boot-anim -no-snapshot -accel off & \
+    ${ANDROID_HOME}/emulator/emulator -avd testEmulator -no-audio -no-window -no-boot-anim -no-snapshot -accel off -ports 5554,5555 & \
     emulator_pid=$! && \
+    
     /wait_for_emulator.sh && \
+    
     echo 'Starting Appium...' && \
-    appium --relaxed-security & \
+    appium --relaxed-security --allow-insecure=adb_shell --base-path /wd/hub --address 0.0.0.0 --port 4723 & \
     appium_pid=$! && \
-    sleep 10 && \
+    sleep 15 && \
+    
+    echo 'Checking Appium status...' && \
+    curl --retry 10 --retry-delay 5 --retry-connrefused http://localhost:4723/wd/hub/status || (echo 'Appium failed to start' && exit 1) && \
+    
     echo 'Running tests...' && \
     source ./venv/bin/activate && \
     robot --outputdir test_results /app/test_cases || true && \
-    echo 'Tests completed' && \
+    
+    echo 'Cleaning up...' && \
     kill $appium_pid $emulator_pid"]
