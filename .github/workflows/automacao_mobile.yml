@@ -1,4 +1,4 @@
-name: Testes Android com Emulador
+name: Android Emulator Tests with Robot Framework
 
 on:
   push:
@@ -12,37 +12,33 @@ jobs:
     timeout-minutes: 45
 
     steps:
-      - name: 🧾 Checkout do código
+      - name: 🧾 Checkout code
         uses: actions/checkout@v4
 
-      - name: 🐳 Build da imagem Docker
-        run: |
-          docker build -t robot-tests .
+      - name: 🐳 Build Docker image
+        run: docker build -t robot-tests .
 
-      - name: ▶️ Executar testes no container (com mapeamento de porta para Appium)
+      - name: ▶️ Run tests in container
         run: |
-          docker run -d -p 4723:4723 --name emulador-testes robot-tests
+          mkdir -p ./results
+          docker run \
+            --name emulador-testes \
+            -p 4723:4723 \
+            -v $PWD/results:/app/test_results \
+            robot-tests
 
-      - name: 🛑 Esperar container finalizar os testes
-        run: |
-          docker wait emulador-testes
-
-      - name: 📁 Copiar resultados do container
-        if: always()
-        run: |
-          docker cp emulador-testes:/app/test_results ./results
-
-      - name: 📤 Upload dos relatórios do Robot Framework
+      - name: 📤 Upload Robot Framework reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: resultados-robot
+          name: robot-framework-results
           path: |
             results/output.xml
             results/report.html
             results/log.html
+            results/*.png
 
-      - name: 🧹 Remover container
+      - name: 🧹 Cleanup container
         if: always()
         run: |
-          docker rm emulador-testes
+          docker rm -f emulador-testes || true

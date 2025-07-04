@@ -75,7 +75,7 @@ RUN npm install -g appium@2.13.0 && \
 # Set working directory
 WORKDIR /app
 
-# Copy project files
+# Copy project files including test_cases directory
 COPY . .
 
 # Create Python virtual environment and install dependencies
@@ -83,7 +83,7 @@ RUN python3 -m venv venv && \
     ./venv/bin/pip install --upgrade pip && \
     ./venv/bin/pip install -r requirements.txt
 
-# Execution command
+# Execution command - now explicitly pointing to /app/test_cases
 CMD ["/bin/bash", "-c", "\
     ${ANDROID_HOME}/emulator/emulator -avd testEmulator -no-audio -no-window -no-boot-anim -accel off & \
     emulator_pid=$! && \
@@ -94,5 +94,5 @@ CMD ["/bin/bash", "-c", "\
     appium_pid=$! && \
     sleep 10 && \
     source ./venv/bin/activate && \
-    robot --outputdir test_results test_cases && \
+    robot --outputdir test_results /app/test_cases && \
     kill $appium_pid $emulator_pid"]
