@@ -28,6 +28,7 @@ RUN apt-get update && \
         libxtst6 \
         qemu-kvm \
         tzdata \
+        file \
         && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
@@ -49,7 +50,7 @@ RUN mkdir -p ${ANDROID_HOME}/cmdline-tools && \
     mv tmp/cmdline-tools/* ${ANDROID_HOME}/cmdline-tools/latest/ && \
     rm -rf tools.zip tmp
 
-# Accept licenses and install SDK components
+# Accept licenses and install SDK components (ARM64)
 RUN mkdir -p ~/.android && touch ~/.android/repositories.cfg && \
     yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --sdk_root=${ANDROID_HOME} --licenses > /dev/null && \
     ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --sdk_root=${ANDROID_HOME} \
@@ -59,11 +60,11 @@ RUN mkdir -p ~/.android && touch ~/.android/repositories.cfg && \
     ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --sdk_root=${ANDROID_HOME} \
         "emulator" --channel=0 && \
     ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --sdk_root=${ANDROID_HOME} \
-        "system-images;android-30;google_apis;x86_64" --channel=0
+        "system-images;android-30;google_apis;arm64-v8a" --channel=0
 
-# Create AVD
+# Create AVD (ARM64)
 RUN echo "no" | ${ANDROID_HOME}/cmdline-tools/latest/bin/avdmanager \
-    create avd -n testEmulator -k "system-images;android-30;google_apis;x86_64" \
+    create avd -n testEmulator -k "system-images;android-30;google_apis;arm64-v8a" \
     --device "pixel_4" --force
 
 # Install Appium
@@ -71,10 +72,16 @@ RUN npm install -g appium@2.13.0 && \
     npm install -g appium-doctor && \
     appium driver install uiautomator2
 
-# Create wait script in root
+# Create wait script with ARM compatibility check
 RUN echo '#!/bin/bash\n\
-echo "Waiting for ADB..."\n\
+echo "Checking device architecture..."\n\
 adb wait-for-device\n\
+ARCH=$(adb shell getprop ro.product.cpu.abi)\n\
+echo "Device architecture: $ARCH"\n\
+if [[ "$ARCH" != "arm64-v8a" ]]; then\n\
+  echo "❌ Architecture mismatch! Expected arm64-v8a but got $ARCH"\n\
+  exit 1\n\
+fi\n\
 echo "Waiting for boot completion..."\n\
 while [ "$(adb shell getprop sys.boot_completed | tr -d '"'"'\r'"'"')" != "1" ]; do\n\
   echo "Emulator not ready yet..."\n\
@@ -85,11 +92,24 @@ echo "Emulator ready!"\n\
 sleep 15' > /wait_for_emulator.sh && \
     chmod +x /wait_for_emulator.sh
 
-# Set working directory and copy files
+# Set working directory and verify APK
 WORKDIR /app
 COPY . .
-COPY ./apps/app.apk /app/apps/app.apk
-RUN unzip -t /app/apps/app.apk >/dev/null || { echo "❌ APK verification failed"; exit 1; }
+COPY ./apps/app.apk /tmp/app.apk
+RUN echo "Verifying APK..." && \
+    if [ ! -f /tmp/app.apk ]; then \
+      echo "❌ APK file not found"; \
+      exit 1; \
+    fi && \
+    if ! unzip -t /tmp/app.apk >/dev/null 2>&1; then \
+      echo "❌ APK verification failed - Invalid ZIP archive"; \
+      echo "File info:"; \
+      file /tmp/app.apk; \
+      exit 1; \
+    fi && \
+    mkdir -p /app/apps && \
+    mv /tmp/app.apk /app/apps/app.apk && \
+    echo "✅ APK verified (size: $(du -h /app/apps/app.apk | cut -f1))"
 
 # Create Python environment
 RUN python3 -m venv venv && \
@@ -98,22 +118,28 @@ RUN python3 -m venv venv && \
 
 # Execution command
 CMD ["/bin/bash", "-c", "\
-    # Start emulator \
-    echo 'Starting emulator...' && \
-    ${ANDROID_HOME}/emulator/emulator -avd testEmulator -no-audio -no-window -no-boot-anim -no-snapshot -ports 5554,5555 > /app/emulator.log 2>&1 & \
+    # Start emulator with ARM compatibility \
+    ${ANDROID_HOME}/emulator/emulator -avd testEmulator -no-audio -no-window -no-boot-anim -no-snapshot -ports 5554,5555 -gpu swiftshader_indirect & \
     emulator_pid=$! && \
     \
     # Wait for emulator \
-    echo 'Waiting for emulator to be ready...' && \
-    /wait_for_emulator.sh || { echo 'Emulator failed to start'; exit 1; } && \
+    /wait_for_emulator.sh || { echo '❌ Emulator failed to start properly'; exit 1; } && \
     \
-    # Verify ADB devices \
-    echo 'Connected devices:' && \
-    adb devices && \
+    # Verify APK architecture \
+    echo 'Checking APK native libraries...' && \
+    if ! unzip -l /app/apps/app.apk | grep -q 'lib/arm64-v8a/'; then \
+      echo '⚠️ Warning: No arm64-v8a native libraries found in APK'; \
+    fi && \
     \
-    # Install APK (added this crucial step) \
+    # Install APK \
     echo 'Installing APK...' && \
-    adb install -t -g /app/apps/app.apk || { echo 'APK installation failed'; exit 1; } && \
+    adb install -r -t -g /app/apps/app.apk || { \
+      echo '❌ APK installation failed'; \
+      echo 'Device info:'; \
+      adb devices -l; \
+      adb shell getprop ro.product.cpu.abi; \
+      exit 1; \
+    } && \
     \
     # Start Appium \
     echo 'Starting Appium...' && \
