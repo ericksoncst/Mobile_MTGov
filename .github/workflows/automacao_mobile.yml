@@ -1,88 +1,26 @@
-name: Android Emulator Tests with Robot Framework
+name: Basic Android Tests
 
-on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+on: [push, pull_request]
 
 jobs:
-  robot-tests:
+  test:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
-
+    timeout-minutes: 30
+    
     steps:
-      - name: 🏗️ Setup Ubuntu Environment
-        uses: actions/setup-node@v3
-        with:
-          node-version: '20.x'
+      - uses: actions/checkout@v4
       
-      - name: � Checkout code
-        uses: actions/checkout@v4
-
-      - name: 🐳 Build Docker image
-        run: docker build -t robot-tests .
-          
-      - name: 🏁 Start Test Container
+      - name: Build and run tests
         run: |
-          mkdir -p ./results
+          docker build -t android-tests .
           docker run \
-            --name emulador-testes \
-            -p 4723:4723 \
-            -p 5554:5554 \
-            -p 5555:5555 \
-            -e TZ=UTC \
-            -v $PWD/results:/app/test_results \
-            --device /dev/kvm \
-            --cap-add=NET_ADMIN \
-            --shm-size=2g \
-            -d \
-            robot-tests
-
-      - name: 🔍 Monitor Test Progress
-        run: |
-          # Start log streaming in background
-          docker logs -f emulador-testes > test.log 2>&1 &
+            --name test-container \
+            -v $(pwd)/results:/app/results \
+            android-tests
           
-          # Wait for container to complete with timeout
-          end=$((SECONDS+3000)) # 50 minute timeout
-          while [ $SECONDS -lt $end ]; do
-            if ! docker ps | grep -q emulador-testes; then
-              break
-            fi
-            sleep 10
-          done
-          
-          # Verify test results
-          if [ -f results/output.xml ]; then
-            echo "✅ Tests completed successfully"
-          else
-            echo "::error::❌ Tests failed to complete"
-            docker logs emulador-testes > container.log
-            exit 1
-          fi
-
-      - name: 📦 Upload Test Artifacts
+      - name: Upload results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-artifacts
-          path: |
-            results/output.xml
-            results/report.html
-            results/log.html
-            results/*.png
-            test.log
-            container.log
-
-      - name: 📋 Upload Appium Logs
-        if: always()
-        run: |
-          docker cp emulador-testes:/app/appium.log ./results/appium.log || true
-          docker cp emulador-testes:/app/emulator.log ./results/emulator.log || true
-
-      - name: 🧹 Cleanup Container
-        if: always()
-        run: |
-          docker stop emulador-testes || true
-          docker rm -f emulador-testes || true
+          name: test-results
+          path: results
