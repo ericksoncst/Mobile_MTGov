@@ -12,18 +12,20 @@ jobs:
     timeout-minutes: 60
 
     steps:
-      - name: 🏗️ Setup
+      # PHASE 1: SETUP
+      - name: 🏗️ Setup Environment
         uses: actions/setup-node@v3
         with:
           node-version: '20.x'
       
-      - name: 🧾 Checkout
+      - name: 🧾 Checkout Code
         uses: actions/checkout@v4
 
-      - name: 🐳 Build Image
+      - name: 🐳 Build Docker Image
         run: docker build -t android-tests .
 
-      - name: 🚀 Launch Container
+      # PHASE 2: LAUNCH CONTAINER
+      - name: 🚀 Launch Test Environment
         run: |
           mkdir -p ./results
           docker run \
@@ -38,45 +40,74 @@ jobs:
             -d \
             android-tests \
             /bin/bash -c "\
-              # Start emulator in background
+              # Start emulator and track PID
               \$ANDROID_HOME/emulator/emulator -avd testEmulator -no-audio -no-window -no-snapshot -ports 5554,5555 & \
-              EMULATOR_PID=\$! && \
+              echo \$! > /emulator.pid && \
               \
-              # Wait for emulator
+              # Verify emulator boot
               adb wait-for-device && \
               while [ \"\$(adb shell getprop sys.boot_completed | tr -d '\\r')\" != \"1\" ]; do sleep 5; done && \
+              echo 'Emulator ready' > /emulator.status && \
               \
-              # Start Appium
+              # Start Appium and track PID
               appium --relaxed-security --address 0.0.0.0 --port 4723 & \
-              APPIUM_PID=\$! && \
+              echo \$! > /appium.pid && \
               \
-              # Wait for Appium
+              # Verify Appium readiness
               until curl -s http://localhost:4723/wd/hub/status >/dev/null; do sleep 5; done && \
+              echo 'Appium ready' > /appium.status && \
               \
-              # Run tests
-              source ./venv/bin/activate && \
-              robot --outputdir test_results test_cases && \
-              \
-              # Cleanup
-              kill \$APPIUM_PID \$EMULATOR_PID"
+              # Keep container running
+              tail -f /dev/null"
 
-      - name: 📦 Get Results
+      # PHASE 3: VERIFICATION
+      - name: 🔍 Verify Services
+        run: |
+          # Check emulator status
+          timeout 2m bash -c '\
+            until docker exec test-container test -f /emulator.status; do \
+              echo "Waiting for emulator..."; \
+              sleep 5; \
+            done'
+          
+          # Check Appium status
+          timeout 2m bash -c '\
+            until docker exec test-container test -f /appium.status; do \
+              echo "Waiting for Appium..."; \
+              sleep 5; \
+            done'
+          
+          echo "All services ready!"
+
+      # PHASE 4: TEST EXECUTION
+      - name: 🧪 Run Tests
+        run: |
+          docker exec test-container /bin/bash -c "\
+            source ./venv/bin/activate && \
+            robot --outputdir /app/test_results /app/test_cases"
+          
+          # Copy results (with error suppression)
+          docker cp test-container:/app/test_results ./results/ 2>/dev/null || true
+
+      # PHASE 5: ARTIFACT COLLECTION
+      - name: 📦 Gather Results
         if: always()
         run: |
-          docker cp test-container:/app/test_results ./results/
           docker logs test-container > container.log 2>&1 || true
+          docker cp test-container:/emulator.status ./emulator.status 2>/dev/null || true
+          docker cp test-container:/appium.status ./appium.status 2>/dev/null || true
 
       - name: 📤 Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: test-results
           path: |
-            results/output.xml
-            results/report.html
-            results/log.html
-            container.log
+            results/
+            *.log
+            *.status
 
+      # PHASE 6: CLEANUP
       - name: 🧹 Cleanup
         if: always()
         run: |
-          docker rm -f test-container || true
+          docker rm -f test-container 2>/dev/null || true
