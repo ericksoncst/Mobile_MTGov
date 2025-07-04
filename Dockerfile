@@ -1,120 +1,61 @@
 FROM ubuntu:22.04
 
-# Set environment variables
-ENV DEBIAN_FRONTEND=noninteractive \
-    TZ=UTC \
-    ANDROID_HOME=/opt/android-sdk \
-    JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 \
-    PATH="${JAVA_HOME}/bin:${PATH}:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${ANDROID_HOME}/emulator"
+# --- SYSTEM SETUP ---
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y \
+    curl unzip wget git python3 python3-pip \
+    openjdk-11-jdk libgl1-mesa-dev libpulse-dev \
+    libqt5widgets5 libqt5gui5 libqt5core5a \
+    libqt5network5 qemu-kvm \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install dependencies
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        ca-certificates \
-        curl \
-        gnupg \
-        python3-pip \
-        python3-venv \
-        android-tools-adb \
-        openjdk-17-jdk \
-        wget \
-        unzip \
-        libgl1 \
-        libpulse0 \
-        libx11-6 \
-        libxcb1 \
-        libxext6 \
-        libxrender1 \
-        libxtst6 \
-        qemu-kvm \
-        tzdata \
-        && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+# --- ANDROID SDK SETUP ---
+ENV ANDROID_HOME=/opt/android-sdk
+ENV PATH=$PATH:$ANDROID_HOME/emulator:$ANDROID_HOME/tools:$ANDROID_HOME/tools/bin:$ANDROID_HOME/platform-tools
 
-# Install Node.js 20.x
-RUN mkdir -p /etc/apt/keyrings && \
-    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg && \
-    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list && \
-    apt-get update && \
-    apt-get install -y nodejs && \
-    npm install -g npm@latest
+RUN mkdir -p ${ANDROID_HOME} && \
+    cd ${ANDROID_HOME} && \
+    curl -o sdk.zip https://dl.google.com/android/repository/commandlinetools-linux-10406996_latest.zip && \
+    unzip sdk.zip -d cmdline-tools && \
+    mv cmdline-tools cmdline-tools/latest && \
+    rm sdk.zip
 
-# Install Android SDK
-RUN mkdir -p ${ANDROID_HOME}/cmdline-tools && \
-    cd ${ANDROID_HOME}/cmdline-tools && \
-    wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O tools.zip && \
-    unzip -q tools.zip -d tmp && \
-    mkdir -p ${ANDROID_HOME}/cmdline-tools/latest && \
-    mv tmp/cmdline-tools/* ${ANDROID_HOME}/cmdline-tools/latest/ && \
-    rm -rf tools.zip tmp
+RUN yes | sdkmanager --licenses && \
+    sdkmanager "platform-tools" "emulator" "platforms;android-33" "system-images;android-33;google_apis;x86_64"
 
-# Accept licenses and install SDK components
-RUN mkdir -p ~/.android && touch ~/.android/repositories.cfg && \
-    yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --sdk_root=${ANDROID_HOME} --licenses > /dev/null && \
-    ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --sdk_root=${ANDROID_HOME} \
-        "platform-tools" \
-        "platforms;android-30" \
-        "build-tools;30.0.3" && \
-    ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --sdk_root=${ANDROID_HOME} \
-        "emulator" --channel=0 && \
-    ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --sdk_root=${ANDROID_HOME} \
-        "system-images;android-30;google_apis;x86_64" --channel=0
+# --- CREATE AVD ---
+RUN echo "no" | avdmanager create avd -n testEmulator -k "system-images;android-33;google_apis;x86_64" --device "pixel"
 
-# Create AVD
-RUN echo "no" | ${ANDROID_HOME}/cmdline-tools/latest/bin/avdmanager \
-    create avd -n testEmulator -k "system-images;android-30;google_apis;x86_64" \
-    --device "pixel_4" --force
+# --- PYTHON + ROBOT ---
+RUN pip3 install robotframework robotframework-appiumlibrary
 
-# Install Appium and drivers
-RUN npm install -g appium@2.13.0 && \
-    npm install -g appium-doctor && \
-    appium driver install uiautomator2
+# --- INSTALL APPIUM ---
+RUN npm install -g appium
 
-# Set working directory and copy app files
+# --- SETUP PROJECT STRUCTURE ---
 WORKDIR /app
 COPY . .
-COPY ./apps/app.apk /app/apps/app.apk
 
-# Create Python environment
-RUN python3 -m venv venv && \
-    ./venv/bin/pip install --upgrade pip && \
-    ./venv/bin/pip install -r requirements.txt
+# --- VENV + DEPENDENCIES ---
+RUN python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt || true
 
-# Execution command
+# --- STARTUP SCRIPT ---
 CMD ["/bin/bash", "-c", "\
-    # Start emulator
     ${ANDROID_HOME}/emulator/emulator -avd testEmulator -no-audio -no-window -no-snapshot -no-boot-anim -ports 5554,5555 & \
     emulator_pid=$! && \
-    \
     echo '⏳ Waiting for emulator...' && \
     adb wait-for-device && \
     while [ \"$(adb shell getprop sys.boot_completed | tr -d '\r')\" != \"1\" ]; do \
-      echo '🕐 Boot not complete yet...'; \
-      sleep 5; \
+        echo '🕐 Boot not complete yet...'; \
+        sleep 5; \
     done && \
     echo '✅ Boot complete. Unlocking screen...' && \
     adb shell input keyevent 82 && \
     adb shell wm dismiss-keyguard && \
-    \
-    echo '⏳ Waiting a bit for system to stabilize...' && \
-    sleep 20 && \
-    \
-    echo '🔍 Devices connected:' && \
-    adb devices && \
-    \
+    sleep 10 && \
     echo '🚀 Starting Appium...' && \
-    appium \
-      --relaxed-security \
-      --allow-insecure=adb_shell \
-      --base-path /wd/hub \
-      --address 0.0.0.0 \
-      --port 4723 \
-      --log-timestamp \
-      --local-timezone \
-      --log-level debug &> /app/appium.log & \
+    appium --relaxed-security --allow-insecure=adb_shell --base-path /wd/hub --address 0.0.0.0 --port 4723 --log-level debug &> /app/appium.log & \
     appium_pid=$! && \
-    \
     echo '⏳ Waiting for Appium (HTTP check)...' && \
     for i in {1..10}; do \
       if curl -s http://localhost:4723/wd/hub/status >/dev/null; then \
@@ -129,10 +70,10 @@ CMD ["/bin/bash", "-c", "\
         exit 1; \
       fi; \
     done && \
-    \
     echo '🧪 Starting Robot tests...' && \
     source ./venv/bin/activate && \
+    mkdir -p /app/test_results && \
     robot --outputdir /app/test_results /app/test_cases || true && \
-    \
     echo '✅ Tests completed.' && \
-    kill -9 $appium_pid $emulator_pid 2>/dev/null || true"]
+    kill -9 $appium_pid $emulator_pid 2>/dev/null || true && \
+    tail -f /dev/null"]

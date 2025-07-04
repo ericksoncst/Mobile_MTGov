@@ -12,90 +12,38 @@ jobs:
     timeout-minutes: 60
 
     steps:
-      # PHASE 1: SETUP
-      - name: 🏗️ Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '20.x'
-
       - name: 🧾 Checkout Code
         uses: actions/checkout@v4
 
       - name: 🐳 Build Docker Image
         run: docker build -t android-tests .
 
-      # PHASE 2: CONTAINER START
-      - name: 🚀 Launch Test Environment
+      - name: 🚀 Launch Test Container
         run: |
-          mkdir -p ./results
-
-          if [ ! -f ./apps/app.apk ]; then
-            echo "❌ APK not found at ./apps/app.apk"
-            exit 1
-          fi
-
           docker run \
             --name test-container \
+            --privileged \
+            -e TZ=UTC \
             -p 4723:4723 \
             -p 5554:5554 \
             -p 5555:5555 \
-            -e TZ=UTC \
             --device /dev/kvm \
             --cap-add=NET_ADMIN \
             --shm-size=2g \
             -d \
-            android-tests \
-            /bin/bash -c "\
-              \$ANDROID_HOME/emulator/emulator -avd testEmulator -no-audio -no-window -no-snapshot -ports 5554,5555 & \
-              echo \$! > /emulator.pid && \
-              adb wait-for-device && \
-              while [ \"\$(adb shell getprop sys.boot_completed | tr -d '\\r')\" != \"1\" ]; do sleep 5; done && \
-              echo 'Emulator ready' > /emulator.status && \
-              appium --relaxed-security --base-path /wd/hub --address 0.0.0.0 --port 4723 & \
-              echo \$! > /appium.pid && \
-              until curl -s http://127.0.0.1:4723/wd/hub/status | grep -q 'Appium server ready'; do sleep 5; done && \
-              echo 'Appium ready' > /appium.status && \
-              tail -f /dev/null"
+            android-tests
 
-      # PHASE 3: SERVICE VERIFICATION
-      - name: 🔍 Verify Services
+      - name: ⏳ Wait for Startup (emulator + appium)
         run: |
-          timeout 2m bash -c '\
-            until docker exec test-container test -f /emulator.status; do \
-              echo "Waiting for emulator..."; \
-              sleep 5; \
-            done'
+          echo "Waiting 90 seconds for emulator and Appium to boot..."
+          sleep 90
 
-          timeout 2m bash -c '
-            until docker exec test-container curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:4723/wd/hub/status | grep -q "200"; do
-              echo "Waiting for Appium (HTTP 200)..."
-              sleep 5
-            done'
-
-          echo "✅ All services ready!"
-
-      # PHASE 4: TEST EXECUTION
-      - name: 🧪 Run Tests
-        run: |
-          docker exec test-container /bin/bash -c "\
-            source ./venv/bin/activate && \
-            robot --outputdir /app/test_results /app/test_cases"
-
-          docker cp test-container:/app/test_results ./results/ 2>/dev/null || true
-
-      # PHASE 5: LOG DUMP (EXTRA)
-      - name: 📖 Dump Appium Log
+      - name: 📄 Fetch Logs & Results
         if: always()
         run: |
-          docker exec test-container tail -n 100 /app/appium.log || echo "No Appium log found"
-
-      # PHASE 6: ARTIFACT COLLECTION
-      - name: 📦 Gather Results
-        if: always()
-        run: |
-          docker logs test-container > container.log 2>&1 || true
-          docker cp test-container:/emulator.status ./emulator.status 2>/dev/null || true
-          docker cp test-container:/appium.status ./appium.status 2>/dev/null || true
+          docker logs test-container > container.log || true
+          docker cp test-container:/app/appium.log ./appium.log || true
+          docker cp test-container:/app/test_results ./results || true
 
       - name: 📤 Upload Artifacts
         uses: actions/upload-artifact@v4
@@ -103,11 +51,9 @@ jobs:
           name: test-results
           path: |
             results/
-            *.log
-            *.status
+            container.log
+            appium.log
 
-      # PHASE 7: CLEANUP
       - name: 🧹 Cleanup
         if: always()
-        run: |
-          docker rm -f test-container 2>/dev/null || true
+        run: docker rm -f test-container || true
