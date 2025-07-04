@@ -1,4 +1,4 @@
-name: Android Emulator Tests with Robot Framework
+name: Android Emulator Tests
 
 on:
   push:
@@ -12,76 +12,61 @@ jobs:
     timeout-minutes: 60
 
     steps:
-      # PHASE 1: SETUP
-      - name: 🏗️ Setup Environment
+      - name: 🏗️ Setup
         uses: actions/setup-node@v3
         with:
           node-version: '20.x'
       
-      - name: 🧾 Checkout Code
+      - name: 🧾 Checkout
         uses: actions/checkout@v4
 
-      - name: 🐳 Build Docker Image
-        run: docker build -t robot-tests .
+      - name: 🐳 Build Image
+        run: docker build -t android-tests .
 
-      # PHASE 2: EMULATOR START
-      - name: 🚀 Start Emulator
-        id: emulator-start
+      - name: 🚀 Launch Container
         run: |
           mkdir -p ./results
-          # Start container with health check
           docker run \
-            --name emulator-container \
+            --name test-container \
+            -p 4723:4723 \
             -p 5554:5554 \
             -p 5555:5555 \
-            -p 4723:4723 \
             -e TZ=UTC \
             --device /dev/kvm \
             --cap-add=NET_ADMIN \
             --shm-size=2g \
-            --health-cmd "adb shell getprop sys.boot_completed | grep 1" \
-            --health-interval 5s \
-            --health-retries 30 \
             -d \
-            robot-tests \
+            android-tests \
             /bin/bash -c "\
-              \$ANDROID_HOME/emulator/emulator -avd testEmulator -no-audio -no-window -no-snapshot -verbose -ports 5554,5555 \
-              > /emulator.log 2>&1 & \
-              echo \$! > /emulator.pid; \
-              tail -f /dev/null"  # Keep container running
+              # Start emulator in background
+              \$ANDROID_HOME/emulator/emulator -avd testEmulator -no-audio -no-window -no-snapshot -ports 5554,5555 & \
+              EMULATOR_PID=\$! && \
+              \
+              # Wait for emulator
+              adb wait-for-device && \
+              while [ \"\$(adb shell getprop sys.boot_completed | tr -d '\\r')\" != \"1\" ]; do sleep 5; done && \
+              \
+              # Start Appium
+              appium --relaxed-security --address 0.0.0.0 --port 4723 & \
+              APPIUM_PID=\$! && \
+              \
+              # Wait for Appium
+              until curl -s http://localhost:4723/wd/hub/status >/dev/null; do sleep 5; done && \
+              \
+              # Run tests
+              source ./venv/bin/activate && \
+              robot --outputdir test_results test_cases && \
+              \
+              # Cleanup
+              kill \$APPIUM_PID \$EMULATOR_PID"
 
-          # Wait for container to be healthy
-          echo "Waiting for emulator to boot..."
-          timeout 5m bash -c 'while [ \"$(docker inspect -f {{.State.Health.Status}} emulator-container)\" != \"healthy\" ]; do sleep 5; done'
-          
-          # Verify emulator is running
-          docker exec emulator-container test -f /emulator.pid || (echo "::error::Emulator failed to start"; exit 1)
-          echo "Emulator started successfully"
-
-      # PHASE 3: APPIUM & TESTS
-      - name: 🧪 Run Appium & Tests
-        run: |
-          # Start Appium
-          docker exec -d emulator-container /bin/bash -c "\
-            appium --relaxed-security --address 0.0.0.0 --port 4723 --log-timestamp \
-            > /appium.log 2>&1 &"
-          
-          # Wait for Appium to be ready
-          echo "Waiting for Appium..."
-          timeout 2m bash -c 'until docker exec emulator-container curl -s http://localhost:4723/wd/hub/status >/dev/null; do sleep 5; done'
-          
-          # Run tests
-          echo "Starting tests..."
-          docker exec emulator-container /bin/bash -c "\
-            source ./venv/bin/activate && \
-            robot --outputdir test_results test_cases"
-          
-          # Copy results
-          docker cp emulator-container:/app/test_results ./results/
-
-      # PHASE 4: ARTIFACTS
-      - name: 📦 Upload Results
+      - name: 📦 Get Results
         if: always()
+        run: |
+          docker cp test-container:/app/test_results ./results/
+          docker logs test-container > container.log 2>&1 || true
+
+      - name: 📤 Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: test-results
@@ -89,18 +74,9 @@ jobs:
             results/output.xml
             results/report.html
             results/log.html
-            results/*.png
+            container.log
 
-      - name: 📜 Get Logs
-        if: always()
-        run: |
-          docker logs emulator-container > container.log 2>&1 || true
-          docker cp emulator-container:/emulator.log ./emulator.log || true
-          docker cp emulator-container:/appium.log ./appium.log || true
-
-      # PHASE 5: CLEANUP
       - name: 🧹 Cleanup
         if: always()
         run: |
-          docker stop emulator-container || true
-          docker rm -f emulator-container || true
+          docker rm -f test-container || true
