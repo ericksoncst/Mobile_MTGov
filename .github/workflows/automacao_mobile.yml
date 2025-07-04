@@ -13,23 +13,22 @@ jobs:
 
     steps:
       # PHASE 1: SETUP
-      - name: 🏗️ Setup Environment
+      - name: 🏗️ Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '20.x'
-      
+
       - name: 🧾 Checkout Code
         uses: actions/checkout@v4
 
       - name: 🐳 Build Docker Image
         run: docker build -t android-tests .
 
- # PHASE 2: LAUNCH CONTAINER
+      # PHASE 2: CONTAINER START
       - name: 🚀 Launch Test Environment
         run: |
           mkdir -p ./results
 
-          # ✅ SUGESTÃO: garantir que o APK esteja presente antes do container rodar
           if [ ! -f ./apps/app.apk ]; then
             echo "❌ APK not found at ./apps/app.apk"
             exit 1
@@ -47,44 +46,33 @@ jobs:
             -d \
             android-tests \
             /bin/bash -c "\
-              # Start emulator and track PID
               \$ANDROID_HOME/emulator/emulator -avd testEmulator -no-audio -no-window -no-snapshot -ports 5554,5555 & \
               echo \$! > /emulator.pid && \
-              \
-              # Verify emulator boot
               adb wait-for-device && \
               while [ \"\$(adb shell getprop sys.boot_completed | tr -d '\\r')\" != \"1\" ]; do sleep 5; done && \
               echo 'Emulator ready' > /emulator.status && \
-              \
-              # Start Appium and track PID
-              appium --relaxed-security --base-path /wd/hub --address 0.0.0.0 --port 4723 &
+              appium --relaxed-security --base-path /wd/hub --address 0.0.0.0 --port 4723 & \
               echo \$! > /appium.pid && \
-              \
-              # Verify Appium readiness
-              until curl -s http://localhost:4723/wd/hub/status >/dev/null; do sleep 5; done && \
+              until curl -s http://127.0.0.1:4723/wd/hub/status | grep -q 'Appium server ready'; do sleep 5; done && \
               echo 'Appium ready' > /appium.status && \
-              \
-              # Keep container running
               tail -f /dev/null"
 
-      # PHASE 3: VERIFICATION
+      # PHASE 3: SERVICE VERIFICATION
       - name: 🔍 Verify Services
         run: |
-          # Check emulator status
           timeout 2m bash -c '\
             until docker exec test-container test -f /emulator.status; do \
               echo "Waiting for emulator..."; \
               sleep 5; \
             done'
-          
-          # Check Appium status
+
           timeout 2m bash -c '\
-            until docker exec test-container test -f /appium.status; do \
-              echo "Waiting for Appium..."; \
+            until docker exec test-container curl -s http://127.0.0.1:4723/wd/hub/status | grep -q "Appium server ready"; do \
+              echo "Waiting for Appium (HTTP check)..."; \
               sleep 5; \
             done'
-          
-          echo "All services ready!"
+
+          echo "✅ All services ready!"
 
       # PHASE 4: TEST EXECUTION
       - name: 🧪 Run Tests
@@ -92,11 +80,16 @@ jobs:
           docker exec test-container /bin/bash -c "\
             source ./venv/bin/activate && \
             robot --outputdir /app/test_results /app/test_cases"
-          
-          # Copy results (with error suppression)
+
           docker cp test-container:/app/test_results ./results/ 2>/dev/null || true
 
-      # PHASE 5: ARTIFACT COLLECTION
+      # PHASE 5: LOG DUMP (EXTRA)
+      - name: 📖 Dump Appium Log
+        if: always()
+        run: |
+          docker exec test-container tail -n 100 /app/appium.log || echo "No Appium log found"
+
+      # PHASE 6: ARTIFACT COLLECTION
       - name: 📦 Gather Results
         if: always()
         run: |
@@ -113,7 +106,7 @@ jobs:
             *.log
             *.status
 
-      # PHASE 6: CLEANUP
+      # PHASE 7: CLEANUP
       - name: 🧹 Cleanup
         if: always()
         run: |

@@ -90,7 +90,6 @@ WORKDIR /app
 COPY . .
 COPY ./apps/app.apk /app/apps/app.apk
 
-
 # Create Python environment
 RUN python3 -m venv venv && \
     ./venv/bin/pip install --upgrade pip && \
@@ -98,15 +97,15 @@ RUN python3 -m venv venv && \
 
 # Execution command
 CMD ["/bin/bash", "-c", "\
-    # Start emulator with explicit ports
+    # Start emulator with explicit ports \
     ${ANDROID_HOME}/emulator/emulator -avd testEmulator -no-audio -no-window -no-boot-anim -no-snapshot -ports 5554,5555 & \
     emulator_pid=$! && \
-    
-    # Wait for emulator (with enhanced checks)
+    \
+    # Wait for emulator \
     /wait_for_emulator.sh && \
-    
-    # Start Appium with proper config
-    echo 'Starting Appium with debug...' && \
+    \
+    # Start Appium \
+    echo 'Starting Appium...' && \
     appium \
       --relaxed-security \
       --allow-insecure=adb_shell \
@@ -117,15 +116,15 @@ CMD ["/bin/bash", "-c", "\
       --local-timezone \
       --log-level debug &> /app/appium.log & \
     appium_pid=$! && \
-    
-    # Wait for Appium (with backoff retries)
+    \
+    # Wait for Appium \
     echo 'Waiting for Appium...' && \
     for i in {1..10}; do \
       if curl -s http://localhost:4723/wd/hub/status >/dev/null; then \
         echo 'Appium ready!' && \
         break; \
       fi; \
-      echo "Attempt $i: Appium not ready yet..."; \
+      echo \"Attempt $i: Appium not ready yet...\"; \
       sleep 5; \
       if [ $i -eq 10 ]; then \
         echo 'Appium failed to start!'; \
@@ -134,12 +133,12 @@ CMD ["/bin/bash", "-c", "\
         exit 1; \
       fi; \
     done && \
-    
-    # Run tests
+    \
+    # Run tests \
     echo 'Running tests...' && \
     source ./venv/bin/activate && \
     robot --outputdir test_results /app/test_cases || true && \
-    
-    # Cleanup
+    \
+    # Cleanup \
     echo 'Test completed with status $?' && \
     kill -9 $appium_pid $emulator_pid 2>/dev/null || true"]
