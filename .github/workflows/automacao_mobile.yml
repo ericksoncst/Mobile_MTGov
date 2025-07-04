@@ -1,4 +1,4 @@
-name: Android Emulator Tests with Robot Framework
+name: Android Emulator Tests with Phases
 
 on:
   push:
@@ -12,6 +12,7 @@ jobs:
     timeout-minutes: 60
 
     steps:
+      # PHASE 1: SETUP
       - name: 🏗️ Setup Environment
         uses: actions/setup-node@v3
         with:
@@ -22,31 +23,52 @@ jobs:
 
       - name: 🐳 Build Docker Image
         run: docker build -t robot-tests .
-          
-      - name: 🚀 Run Tests
+
+      # PHASE 2: EMULATOR START
+      - name: 🚀 Start Emulator
+        id: start-emulator
         run: |
           mkdir -p ./results
-          # Run container with explicit command
           docker run \
-            --name emulador-testes \
-            -p 4723:4723 \
+            --name emulator-container \
             -p 5554:5554 \
             -p 5555:5555 \
             -e TZ=UTC \
-            -v $PWD/results:/app/test_results \
             --device /dev/kvm \
             --cap-add=NET_ADMIN \
             --shm-size=2g \
+            -d \
             robot-tests \
             /bin/bash -c "\
               \$ANDROID_HOME/emulator/emulator -avd testEmulator -no-audio -no-window -no-snapshot & \
               adb wait-for-device && \
-              source ./venv/bin/activate && \
-              robot --outputdir test_results test_cases" || true
+              while [ \"\$(\$ANDROID_HOME/platform-tools/adb shell getprop sys.boot_completed | tr -d '\\r')\" != \"1\" ]; do sleep 5; done && \
+              echo 'Emulator ready' > /emulator.status"
           
-          # Capture logs
-          docker logs emulador-testes > container.log 2>&1 || true
+          # Wait for emulator to fully boot
+          timeout 3m bash -c "until docker exec emulator-container test -f /emulator.status; do sleep 5; done"
+          echo "Emulator started successfully"
 
+      # PHASE 3: TEST EXECUTION
+      - name: 🧪 Run Tests
+        run: |
+          # Start Appium and tests in same container
+          docker exec -d emulator-container /bin/bash -c "\
+            appium --relaxed-security --address 0.0.0.0 --port 4723 &> /appium.log & \
+            sleep 10 && \
+            source ./venv/bin/activate && \
+            robot --outputdir test_results test_cases"
+          
+          # Wait for tests to complete
+          timeout 45m bash -c "while docker ps | grep -q emulator-container; do sleep 10; done"
+          
+          # Verify results
+          if [ ! -f results/output.xml ]; then
+            echo "::error::Tests failed to complete"
+            exit 1
+          fi
+
+      # PHASE 4: RESULTS COLLECTION
       - name: 📦 Upload Results
         if: always()
         uses: actions/upload-artifact@v4
@@ -57,9 +79,15 @@ jobs:
             results/report.html
             results/log.html
             results/*.png
-            container.log
 
+      - name: 📋 Get Logs
+        if: always()
+        run: |
+          docker logs emulator-container > container.log 2>&1 || true
+          docker cp emulator-container:/appium.log ./appium.log || true
+
+      # PHASE 5: CLEANUP
       - name: 🧹 Cleanup
         if: always()
         run: |
-          docker rm -f emulador-testes 2>/dev/null || true
+          docker rm -f emulator-container 2>/dev/null || true
