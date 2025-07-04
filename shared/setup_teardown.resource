@@ -13,7 +13,7 @@ ${APP_ACTIVITY}       br.gov.mt.cepromat.mtcidadao.MainActivity
 abrir app
     [Timeout]    5 minutes
     Wait Until Keyword Succeeds    5x    30s    Open Application
-    ...    http://localhost:4723/wd/hub
+    ...    http://127.0.0.1:4723
     ...    automationName=UiAutomator2
     ...    platformName=${PLATFORM_NAME}
     ...    deviceName=${DEVICE_NAME}
