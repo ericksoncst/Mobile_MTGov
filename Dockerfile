@@ -88,6 +88,8 @@ sleep 15' > /wait_for_emulator.sh && \
 # Set working directory and copy files
 WORKDIR /app
 COPY . .
+COPY ./apps/app.apk /app/apps/app.apk
+
 
 # Create Python environment
 RUN python3 -m venv venv && \

@@ -24,10 +24,17 @@ jobs:
       - name: 🐳 Build Docker Image
         run: docker build -t android-tests .
 
-      # PHASE 2: LAUNCH CONTAINER
+ # PHASE 2: LAUNCH CONTAINER
       - name: 🚀 Launch Test Environment
         run: |
           mkdir -p ./results
+
+          # ✅ SUGESTÃO: garantir que o APK esteja presente antes do container rodar
+          if [ ! -f ./apps/app.apk ]; then
+            echo "❌ APK not found at ./apps/app.apk"
+            exit 1
+          fi
+
           docker run \
             --name test-container \
             -p 4723:4723 \
