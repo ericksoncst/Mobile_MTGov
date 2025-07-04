@@ -26,7 +26,7 @@ jobs:
       - name: 🚀 Run Tests
         run: |
           mkdir -p ./results
-          # Run container in foreground to automatically wait for completion
+          # Run container with explicit command
           docker run \
             --name emulador-testes \
             -p 4723:4723 \
@@ -37,9 +37,14 @@ jobs:
             --device /dev/kvm \
             --cap-add=NET_ADMIN \
             --shm-size=2g \
-            robot-tests || true
+            robot-tests \
+            /bin/bash -c "\
+              \$ANDROID_HOME/emulator/emulator -avd testEmulator -no-audio -no-window -no-snapshot & \
+              adb wait-for-device && \
+              source ./venv/bin/activate && \
+              robot --outputdir test_results test_cases" || true
           
-          # Capture logs if container exists
+          # Capture logs
           docker logs emulador-testes > container.log 2>&1 || true
 
       - name: 📦 Upload Results
