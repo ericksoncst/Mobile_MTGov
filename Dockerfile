@@ -1,9 +1,9 @@
 FROM ubuntu:22.04
 
 # Basic setup
-ENV DEBIAN_FRONTEND=noninteractive
-ENV ANDROID_HOME=/opt/android-sdk
-ENV PATH="${PATH}:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools"
+ENV DEBIAN_FRONTEND=noninteractive \
+    ANDROID_HOME=/opt/android-sdk \
+    PATH="${PATH}:${ANDROID_HOME}/tools/bin:${ANDROID_HOME}/platform-tools"
 
 # Install minimal dependencies
 RUN apt-get update && \
@@ -17,24 +17,23 @@ RUN apt-get update && \
         python3-venv && \
     apt-get clean
 
-# Install Android tools (fixed directory structure)
-RUN mkdir -p ${ANDROID_HOME}/cmdline-tools/latest && \
-    cd ${ANDROID_HOME} && \
+# Install Android tools (simplified approach)
+RUN mkdir -p ${ANDROID_HOME} && cd ${ANDROID_HOME} && \
     wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O tools.zip && \
-    unzip -q tools.zip && \
-    mv cmdline-tools/* cmdline-tools/latest/ && \
-    rm -rf tools.zip cmdline-tools
+    unzip -q tools.zip -d tmp && \
+    mv tmp/cmdline-tools ${ANDROID_HOME}/tools && \
+    rm -rf tools.zip tmp
 
 # Accept licenses and install packages
-RUN yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --sdk_root=${ANDROID_HOME} \
+RUN yes | ${ANDROID_HOME}/tools/bin/sdkmanager \
     "platform-tools" \
     "platforms;android-30" \
     "emulator" && \
-    ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --sdk_root=${ANDROID_HOME} \
+    ${ANDROID_HOME}/tools/bin/sdkmanager \
     "system-images;android-30;google_apis;x86_64"
 
 # Create AVD
-RUN echo "no" | ${ANDROID_HOME}/cmdline-tools/latest/bin/avdmanager create avd \
+RUN echo "no" | ${ANDROID_HOME}/tools/bin/avdmanager create avd \
     -n test -k "system-images;android-30;google_apis;x86_64" --force
 
 # Copy test files
@@ -45,9 +44,7 @@ COPY . .
 RUN python3 -m venv venv && \
     ./venv/bin/pip install -r requirements.txt
 
-# Simple run command
-CMD ["/bin/bash", "-c", "\
-    ${ANDROID_HOME}/emulator/emulator -avd test -no-audio -no-window -no-snapshot & \
+# Simple run command (no logging)
+CMD ${ANDROID_HOME}/emulator/emulator -avd test -no-audio -no-window -no-snapshot & \
     adb wait-for-device && \
-    source ./venv/bin/activate && \
-    robot --outputdir results test_cases"]
+    ./venv/bin/robot --outputdir results test_cases

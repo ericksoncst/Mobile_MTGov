@@ -10,17 +10,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Build and run tests
+      - name: Build and run
         run: |
           docker build -t android-tests .
-          docker run \
-            --name test-container \
-            -v $(pwd)/results:/app/results \
-            android-tests
+          docker run -v $(pwd)/results:/app/results android-tests
           
       - name: Upload results
-        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results
+          name: results
           path: results
