@@ -66,26 +66,12 @@ RUN echo "no" | ${ANDROID_HOME}/cmdline-tools/latest/bin/avdmanager \
     create avd -n testEmulator -k "system-images;android-30;google_apis;x86_64" \
     --device "pixel_4" --force
 
-# Install Appium
+# Install Appium and drivers
 RUN npm install -g appium@2.13.0 && \
     npm install -g appium-doctor && \
     appium driver install uiautomator2
 
-# Create wait script in root
-RUN echo '#!/bin/bash\n\
-echo "Waiting for ADB..."\n\
-adb wait-for-device\n\
-echo "Waiting for boot completion..."\n\
-while [ "$(adb shell getprop sys.boot_completed | tr -d '"'"'\r'"'"')" != "1" ]; do\n\
-  echo "Emulator not ready yet..."\n\
-  sleep 5\n\
-  adb shell input keyevent 82\n\
-done\n\
-echo "Emulator ready!"\n\
-sleep 15' > /wait_for_emulator.sh && \
-    chmod +x /wait_for_emulator.sh
-
-# Set working directory and copy files
+# Set working directory and copy app files
 WORKDIR /app
 COPY . .
 COPY ./apps/app.apk /app/apps/app.apk
@@ -97,15 +83,27 @@ RUN python3 -m venv venv && \
 
 # Execution command
 CMD ["/bin/bash", "-c", "\
-    # Start emulator with explicit ports \
-    ${ANDROID_HOME}/emulator/emulator -avd testEmulator -no-audio -no-window -no-boot-anim -no-snapshot -ports 5554,5555 & \
+    # Start emulator
+    ${ANDROID_HOME}/emulator/emulator -avd testEmulator -no-audio -no-window -no-snapshot -no-boot-anim -ports 5554,5555 & \
     emulator_pid=$! && \
     \
-    # Wait for emulator \
-    /wait_for_emulator.sh && \
+    echo '⏳ Waiting for emulator...' && \
+    adb wait-for-device && \
+    while [ \"$(adb shell getprop sys.boot_completed | tr -d '\r')\" != \"1\" ]; do \
+      echo '🕐 Boot not complete yet...'; \
+      sleep 5; \
+    done && \
+    echo '✅ Boot complete. Unlocking screen...' && \
+    adb shell input keyevent 82 && \
+    adb shell wm dismiss-keyguard && \
     \
-    # Start Appium \
-    echo 'Starting Appium...' && \
+    echo '⏳ Waiting a bit for system to stabilize...' && \
+    sleep 20 && \
+    \
+    echo '🔍 Devices connected:' && \
+    adb devices && \
+    \
+    echo '🚀 Starting Appium...' && \
     appium \
       --relaxed-security \
       --allow-insecure=adb_shell \
@@ -117,28 +115,24 @@ CMD ["/bin/bash", "-c", "\
       --log-level debug &> /app/appium.log & \
     appium_pid=$! && \
     \
-    # Wait for Appium \
-    echo 'Waiting for Appium...' && \
+    echo '⏳ Waiting for Appium (HTTP check)...' && \
     for i in {1..10}; do \
       if curl -s http://localhost:4723/wd/hub/status >/dev/null; then \
-        echo 'Appium ready!' && \
+        echo '✅ Appium is ready!'; \
         break; \
       fi; \
       echo \"Attempt $i: Appium not ready yet...\"; \
       sleep 5; \
       if [ $i -eq 10 ]; then \
-        echo 'Appium failed to start!'; \
-        echo 'Last 50 lines of Appium log:'; \
+        echo '❌ Appium failed to start!'; \
         tail -n 50 /app/appium.log; \
         exit 1; \
       fi; \
     done && \
     \
-    # Run tests \
-    echo 'Running tests...' && \
+    echo '🧪 Starting Robot tests...' && \
     source ./venv/bin/activate && \
-    robot --outputdir test_results /app/test_cases || true && \
+    robot --outputdir /app/test_results /app/test_cases || true && \
     \
-    # Cleanup \
-    echo 'Test completed with status $?' && \
+    echo '✅ Tests completed.' && \
     kill -9 $appium_pid $emulator_pid 2>/dev/null || true"]
