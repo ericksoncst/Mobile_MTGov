@@ -41,7 +41,7 @@ RUN mkdir -p /etc/apt/keyrings && \
     apt-get install -y nodejs && \
     npm install -g npm@latest
 
-# Install Android SDK
+# Install Android SDK (ARM64)
 RUN mkdir -p ${ANDROID_HOME}/cmdline-tools && \
     cd ${ANDROID_HOME}/cmdline-tools && \
     wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O tools.zip && \
@@ -50,7 +50,7 @@ RUN mkdir -p ${ANDROID_HOME}/cmdline-tools && \
     mv tmp/cmdline-tools/* ${ANDROID_HOME}/cmdline-tools/latest/ && \
     rm -rf tools.zip tmp
 
-# Accept licenses and install SDK components (ARM64)
+# Install Android components (ARM64)
 RUN mkdir -p ~/.android && touch ~/.android/repositories.cfg && \
     yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --sdk_root=${ANDROID_HOME} --licenses > /dev/null && \
     ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --sdk_root=${ANDROID_HOME} \
@@ -58,9 +58,9 @@ RUN mkdir -p ~/.android && touch ~/.android/repositories.cfg && \
         "platforms;android-30" \
         "build-tools;30.0.3" && \
     ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --sdk_root=${ANDROID_HOME} \
-        "emulator" --channel=0 && \
+        "emulator" && \
     ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --sdk_root=${ANDROID_HOME} \
-        "system-images;android-30;google_apis;arm64-v8a" --channel=0
+        "system-images;android-30;google_apis;arm64-v8a"
 
 # Create AVD (ARM64)
 RUN echo "no" | ${ANDROID_HOME}/cmdline-tools/latest/bin/avdmanager \
@@ -72,114 +72,91 @@ RUN npm install -g appium@2.13.0 && \
     npm install -g appium-doctor && \
     appium driver install uiautomator2
 
-# Create wait script with ARM compatibility check
+# Optimized wait script (3-minute timeout)
 RUN echo '#!/bin/bash\n\
-echo "Waiting for ADB connection..."\n\
-timeout 60 adb wait-for-device\n\
-if [ $? -ne 0 ]; then\n\
-  echo "❌ Failed to connect to ADB";\n\
-  adb devices -l;\n\
-  exit 1;\n\
-fi\n\
+set -e\n\
+timeout 180 bash -c '\''\n\
+  echo "⏳ Waiting for ADB (max 3m)..."\n\
+  until adb devices | grep -q "emulator"; do sleep 5; done\n\
+  \n\
+  echo "⚙️ Checking boot status..."\n\
+  until adb shell getprop sys.boot_completed | grep -q "1"; do\n\
+    adb shell input keyevent 82\n\
+    sleep 10\n\
+  done\n\
+  \n\
+  echo "🔍 Verifying system stability..."\n\
+  adb shell pm list packages >/dev/null\n\
+'\''\n\
 \n\
-echo "Waiting for boot completion..."\n\
-timeout 300 bash -c '\''\n\
-while [ "$(adb shell getprop sys.boot_completed | tr -d '"'"'\r'"'"')" != "1" ]; do\n\
-  echo "Emulator not ready yet..."\n\
-  sleep 5\n\
-  adb shell input keyevent 82\n\
-done\n\
-echo "Emulator ready!"\n\
-sleep 15' > /wait_for_emulator.sh && \
-    chmod +x /wait_for_emulator.sh
+if [ $? -eq 0 ]; then\n\
+  echo "✅ Emulator ready in $(($SECONDS/60))m$(($SECONDS%60))s"\n\
+else\n\
+  echo "❌ Boot failed"\n\
+  echo "=== Device Info ==="\n\
+  adb devices -l\n\
+  echo "=== System Props ==="\n\
+  adb shell getprop | grep -E "boot|sys"\n\
+  exit 1\n\
+fi' > /wait_for_emulator.sh && \
+chmod +x /wait_for_emulator.sh
 
-# Set working directory and verify APK
+# Copy APK with validation
 WORKDIR /app
 COPY . .
 COPY ./apps/app.apk /tmp/app.apk
-RUN echo "Verifying APK..." && \
-    if [ ! -f /tmp/app.apk ]; then \
-      echo "❌ APK file not found"; \
-      exit 1; \
-    fi && \
-    if ! unzip -t /tmp/app.apk >/dev/null 2>&1; then \
-      echo "❌ APK verification failed - Invalid ZIP archive"; \
-      echo "File info:"; \
-      file /tmp/app.apk; \
-      exit 1; \
-    fi && \
-    mkdir -p /app/apps && \
-    mv /tmp/app.apk /app/apps/app.apk && \
-    echo "✅ APK verified (size: $(du -h /app/apps/app.apk | cut -f1))"
+RUN if [ ! -f /tmp/app.apk ]; then \
+      echo "❌ APK missing"; exit 1; \
+    elif ! unzip -t /tmp/app.apk >/dev/null 2>&1; then \
+      echo "❌ Invalid APK"; file /tmp/app.apk; exit 1; \
+    else \
+      mkdir -p /app/apps && mv /tmp/app.apk /app/apps/app.apk; \
+    fi
 
-# Create Python environment
+# Python environment
 RUN python3 -m venv venv && \
     ./venv/bin/pip install --upgrade pip && \
     ./venv/bin/pip install -r requirements.txt
 
-# Execution command
+# Startup command
 CMD ["/bin/bash", "-c", "\
-    # Start emulator with ARM compatibility \
-    ${ANDROID_HOME}/emulator/emulator -avd testEmulator -no-audio -no-window -no-boot-anim -no-snapshot -ports 5554,5555 -gpu swiftshader_indirect & \
-    emulator_pid=$! && \
-    \
-    # Wait for emulator \
-    /wait_for_emulator.sh || { echo '❌ Emulator failed to start properly'; exit 1; } && \
-    \
-    # Verify APK architecture \
-    echo 'Checking APK native libraries...' && \
-    if ! unzip -l /app/apps/app.apk | grep -q 'lib/arm64-v8a/'; then \
-      echo '⚠️ Warning: No arm64-v8a native libraries found in APK'; \
-    fi && \
-    \
-    # Install APK \
-    echo 'Installing APK...' && \
-    adb install -r -t -g /app/apps/app.apk || { \
-      echo '❌ APK installation failed'; \
-      echo 'Device info:'; \
-      adb devices -l; \
-      adb shell getprop ro.product.cpu.abi; \
+    echo '🚀 Starting emulator...' && \
+    ${ANDROID_HOME}/emulator/emulator -avd testEmulator \
+      -no-audio \
+      -no-window \
+      -no-snapshot \
+      -memory 2048 \
+      -gpu swiftshader_indirect \
+      -ports 5554,5555 &> /app/emulator.log & \
+    \n\
+    echo '⏳ Waiting for emulator...' && \
+    /wait_for_emulator.sh && \
+    \n\
+    echo '💉 Installing APK...' && \
+    adb install -t -g /app/apps/app.apk || { \
+      echo '❌ Install failed'; \
+      adb shell pm list packages; \
       exit 1; \
     } && \
-    \
-    # Start Appium \
-    echo 'Starting Appium...' && \
+    \n\
+    echo '🌐 Starting Appium...' && \
     appium \
       --relaxed-security \
-      --allow-insecure=adb_shell \
       --allow-insecure=apk_check \
       --base-path /wd/hub \
       --address 0.0.0.0 \
-      --port 4723 \
-      --log-timestamp \
-      --local-timezone \
-      --log-level debug &> /app/appium.log & \
-    appium_pid=$! && \
-    \
-    # Wait for Appium \
-    echo 'Waiting for Appium...' && \
-    for i in {1..10}; do \
-      if curl -s http://localhost:4723/wd/hub/status | grep -q '\"status\":0'; then \
-        echo 'Appium ready!' && \
-        break; \
-      fi; \
-      echo \"Attempt $i: Appium not ready yet...\"; \
-      sleep 5; \
-      if [ $i -eq 10 ]; then \
-        echo 'Appium failed to start!'; \
-        echo 'Last 50 lines of Appium log:'; \
-        tail -n 50 /app/appium.log; \
-        exit 1; \
-      fi; \
-    done && \
-    \
-    # Run tests \
-    echo 'Running tests...' && \
+      --port 4723 &> /app/appium.log & \
+    \n\
+    echo '🕒 Waiting for Appium...' && \
+    timeout 60 bash -c '\''\
+      until curl -s http://localhost:4723/wd/hub/status | grep -q \"status\":0; do \
+        sleep 5; \
+      done'\'' || { \
+      echo '❌ Appium failed'; \
+      tail -n 50 /app/appium.log; \
+      exit 1; \
+    } && \
+    \n\
+    echo '🔍 Running tests...' && \
     source ./venv/bin/activate && \
-    robot --outputdir test_results /app/test_cases; \
-    test_exit_code=$? && \
-    \
-    # Cleanup \
-    echo 'Test completed with status $test_exit_code' && \
-    kill -9 $appium_pid $emulator_pid 2>/dev/null || true && \
-    exit $test_exit_code"]
+    robot --outputdir test_results /app/test_cases"]
